@@ -22,6 +22,13 @@ const RAIDS: RaidSpec[] = [
   { day: 58, name: "La hueste del barón bandido", from: { x: -175, z: 30 },
     units: [["spear", 30, "Lanceros del barón"], ["militia", 26, "Mesnada"], ["archer", 18, "Ballesteros"]] },
 ];
+export type Difficulty = "facil" | "normal" | "dificil";
+export const DIFFICULTY: Record<Difficulty, { label: string; size: number; delay: number; note: string }> = {
+  facil: { label: "Fácil", size: 0.75, delay: 6, note: "Bandidos menos numerosos y más tarde." },
+  normal: { label: "Normal", size: 1, delay: 0, note: "La partida tal como está pensada." },
+  dificil: { label: "Difícil", size: 1.3, delay: -4, note: "Más bandidos y antes." },
+};
+
 const WARNING_DAYS = 2;
 const PLUNDER_DAYS = 1;
 const MEN_PER_FAMILY = 4;
@@ -37,6 +44,8 @@ export class Campaign {
   loot = { wood: 0, food: 0, coins: 0 };
   results: ("victoria" | "saqueo")[] = [];
   private levyCount: Record<LevyKind, number> = { spear: 0, archer: 0 };
+  difficulty: Difficulty = "normal";
+  endless = false;              // tras las tres incursiones, seguir con ataques cada vez mayores
   private lastFamilies = 0;
 
   constructor(public village: Village, public battle: Battle) {
@@ -45,17 +54,52 @@ export class Campaign {
     battle.onCasualty = (s) => { if (s.family) village.casualty(s.family); };
   }
 
-  get raid(): RaidSpec | null { return RAIDS[this.raidIndex] ?? null; }
+  /** Incursión i ajustada a la dificultad; en modo libre se generan sin fin. */
+  raidAt(i: number): RaidSpec | null {
+    const d = DIFFICULTY[this.difficulty];
+    let base: RaidSpec | undefined = RAIDS[i];
+    if (!base) {
+      if (!this.endless) return null;
+      const k = i - RAIDS.length + 1;
+      const froms = [{ x: -175, z: 0 }, { x: -170, z: -60 }, { x: -170, z: 60 }];
+      base = {
+        day: RAIDS[RAIDS.length - 1].day + 20 * k, name: `La ${i + 1}.ª incursión`, from: froms[k % froms.length],
+        units: [["spear", 30 + 6 * k, "Lanceros"], ["militia", 26 + 5 * k, "Mesnada"], ["archer", 18 + 4 * k, "Ballesteros"]],
+      };
+    }
+    return {
+      ...base,
+      day: base.day + d.delay,
+      units: base.units.map(([kind, n, name]) => [kind, Math.max(8, Math.round(n * d.size)), name] as [UnitKind, number, string]),
+    };
+  }
+  get raid(): RaidSpec | null {
+    const r = this.raidAt(this.raidIndex);
+    return r && this.raidIndex >= RAIDS.length ? { ...r, day: r.day + this.endlessShift } : r;
+  }
   get totalRaids() { return RAIDS.length; }
 
+  /** Seguir jugando tras ganar: incursiones sin fin. */
+  continueEndless() {
+    if (this.phase !== "won") return;
+    this.endless = true;
+    this.phase = "calm";
+    // La siguiente incursión, al menos 10 días después de hoy
+    const next = this.raidAt(this.raidIndex);
+    if (next && next.day < this.village.day + 10) this.endlessShift = this.village.day + 10 - next.day;
+    this.village.event("Modo libre: las incursiones seguirán, cada vez mayores", "info");
+  }
+  endlessShift = 0;
+
   /** Texto del aviso de la parte superior (o null si no hay nada que avisar). */
-  banner(): { text: string; kind: "warn" | "raid" | "good" | "bad" } | null {
+  banner(): { text: string; kind: "warn" | "raid" | "good" | "bad"; action?: { label: string; run: () => void } } | null {
     const v = this.village, r = this.raid;
     if (this.phase === "won") {
       const wins = this.results.filter((x) => x === "victoria").length;
-      if (wins === RAIDS.length) return { text: `¡Has defendido el señorío! Rechazaste las ${RAIDS.length} incursiones. Fin de la partida.`, kind: "good" };
-      if (wins === 0) return { text: `La aldea sobrevive, pero los bandidos la saquearon las ${RAIDS.length} veces. Fin de la partida.`, kind: "bad" };
-      return { text: `La aldea resiste: rechazaste ${wins} de ${RAIDS.length} incursiones. Fin de la partida.`, kind: "warn" };
+      const more = { label: "Seguir jugando (modo libre)", run: () => this.continueEndless() };
+      if (wins === RAIDS.length) return { text: `¡Has defendido el señorío! Rechazaste las ${RAIDS.length} incursiones.`, kind: "good", action: more };
+      if (wins === 0) return { text: `La aldea sobrevive, pero los bandidos la saquearon las ${RAIDS.length} veces.`, kind: "bad", action: more };
+      return { text: `La aldea resiste: rechazaste ${wins} de ${RAIDS.length} incursiones.`, kind: "warn", action: more };
     }
     if (this.phase === "lost") return { text: "La aldea ha quedado desierta. Fin de la partida.", kind: "bad" };
     if (!r) return null;
@@ -63,7 +107,7 @@ export class Campaign {
       const left = Math.max(0, r.day - v.day);
       return { text: `Bandidos al oeste (${r.name.toLowerCase()}): llegan en ${left < 1 ? Math.ceil(left * 24) + " horas" : Math.ceil(left) + " días"}. Recluta en el cuartel.`, kind: "warn" };
     }
-    if (this.phase === "raid") return { text: `Incursión ${this.raidIndex + 1}/${RAIDS.length}: ${r.name}. Sal a su encuentro antes de que lleguen a la aldea.`, kind: "raid" };
+    if (this.phase === "raid") return { text: `Incursión ${this.raidIndex + 1}${this.endless ? "" : "/" + RAIDS.length}: ${r.name}. Sal a su encuentro antes de que lleguen a la aldea.`, kind: "raid" };
     if (this.phase === "plunder") return { text: `¡Saqueo! Los bandidos se llevan las provisiones y nadie trabaja.`, kind: "bad" };
     if (this.phase === "withdraw") return { text: `Los bandidos se retiran con el botín.`, kind: "bad" };
     return null;
@@ -198,7 +242,8 @@ export class Campaign {
   private nextRaid() {
     this.raiders = [];
     this.raidIndex++;
-    this.phase = this.raidIndex >= RAIDS.length ? "won" : "calm";
+    this.phase = this.raidIndex >= RAIDS.length && !this.endless ? "won" : "calm";
     if (this.phase === "won") this.village.event("Has sobrevivido a las tres incursiones", "good");
+    else if (this.endless) this.village.event(`Incursión ${this.raidIndex} superada. La próxima será mayor.`, "info");
   }
 }

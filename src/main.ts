@@ -13,7 +13,7 @@ import { VillageView } from "./settlement/villageView";
 import { VillageControls } from "./settlement/villageControls";
 import { updateVillagers } from "./settlement/villagers";
 import { VillageHud } from "./ui/villageHud";
-import { Campaign, Phase } from "./campaign/campaign";
+import { Campaign, Phase, Difficulty, DIFFICULTY } from "./campaign/campaign";
 import { serialize, restore, readSave, writeSave } from "./core/save";
 import { loadSettings, Settings } from "./core/settings";
 import { Menu } from "./ui/menu";
@@ -100,8 +100,10 @@ testBattle.onEvent = (kind, x, z) => soundFor(kind, x, z);
 // --- Partida: empezar, cargar y guardar ----------------------------------
 let inGame = false;
 let menuPaused = false;
-function beginNew() {
+function beginNew(difficulty: Difficulty = "normal") {
+  campaign.difficulty = difficulty;
   village.setup();
+  if (difficulty !== "normal") village.event(`Dificultad: ${DIFFICULTY[difficulty].label.toLowerCase()}`, "info");
   inGame = true;
   rts.setView(4, 30, 0.5, 105);
 }
@@ -119,8 +121,11 @@ function saveNow(): boolean {
   return writeSave(serialize(village, forest, campaign, battle));
 }
 // Partida nueva o carga a mitad de partida: se recarga la página para partir de un mundo limpio
-function restartWith(flag: "new" | "continue") {
-  try { sessionStorage.setItem("senorio.start", flag); } catch { /* */ }
+function restartWith(flag: "new" | "continue", difficulty?: string) {
+  try {
+    sessionStorage.setItem("senorio.start", flag);
+    if (difficulty) sessionStorage.setItem("senorio.difficulty", difficulty);
+  } catch { /* */ }
   location.reload();
 }
 
@@ -129,9 +134,10 @@ const menu = new Menu({
     if (inGame) { restartWith("continue"); return; }
     if (beginFromSave()) closeMenu();
   },
-  newGame: () => {
-    if (inGame) { restartWith("new"); return; }
-    beginNew(); closeMenu();
+  newGame: (diff) => {
+    const d = (diff in DIFFICULTY ? diff : "normal") as Difficulty;
+    if (inGame) { restartWith("new", d); return; }
+    beginNew(d); closeMenu();
   },
   saveGame: () => { const ok = saveNow(); if (ok) village.event("Partida guardada", "info"); return ok; },
   testBattle: () => { setMode("battle"); closeMenu(); },
@@ -194,8 +200,13 @@ document.body.dataset.mode = "";
 setMode("village");
 // ¿Venimos de «Partida nueva» o «Cargar» a mitad de partida? Si no, menú principal.
 let startFlag: string | null = null;
-try { startFlag = sessionStorage.getItem("senorio.start"); sessionStorage.removeItem("senorio.start"); } catch { /* */ }
-if (startFlag === "new") beginNew();
+let startDiff: Difficulty = "normal";
+try {
+  startFlag = sessionStorage.getItem("senorio.start"); sessionStorage.removeItem("senorio.start");
+  const d = sessionStorage.getItem("senorio.difficulty"); sessionStorage.removeItem("senorio.difficulty");
+  if (d && d in DIFFICULTY) startDiff = d as Difficulty;
+} catch { /* */ }
+if (startFlag === "new") beginNew(startDiff);
 else if (startFlag === "continue" && beginFromSave()) { /* cargada */ }
 else { rts.setView(4, 30, 0.5, 140); openMenu(); }
 window.addEventListener("beforeunload", () => { if (inGame) saveNow(); });

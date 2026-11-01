@@ -27,7 +27,7 @@ export interface SaveData {
     families: { id: number; name: string; home: number | null; work: number | null; prev: number | null; members: number; levied: number | null; x: number; z: number }[];
   };
   felled: number[];
-  campaign: { raidIndex: number; phase: Phase; results: Campaign["results"]; plunderTime: number; withdrawTime: number; levyCount: Record<string, number> };
+  campaign: { raidIndex: number; phase: Phase; results: Campaign["results"]; plunderTime: number; withdrawTime: number; levyCount: Record<string, number>; difficulty?: Campaign["difficulty"]; endless?: boolean; endlessShift?: number };
   regiments: SavedRegiment[];
 }
 
@@ -40,7 +40,7 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
   return {
     v: VERSION,
     savedAt: Date.now(),
-    summary: summarize(v),
+    summary: `${summarize(v)} · ${c.difficulty === "facil" ? "fácil" : c.difficulty === "dificil" ? "difícil" : "normal"}`,
     village: {
       day: v.day, res: { ...v.res }, approval: v.approval, mods: v.mods.map((m) => ({ ...m })),
       nextId: vv.nextId, nameIdx: vv.nameIdx,
@@ -51,7 +51,7 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
       })),
     },
     felled: forest.trees.flatMap((t, i) => (t.alive ? [] : [i])),
-    campaign: { raidIndex: c.raidIndex, phase: c.phase, results: [...c.results], plunderTime: c.plunderTime, withdrawTime: c.withdrawTime, levyCount: { ...cc.levyCount } },
+    campaign: { raidIndex: c.raidIndex, phase: c.phase, results: [...c.results], plunderTime: c.plunderTime, withdrawTime: c.withdrawTime, levyCount: { ...cc.levyCount }, difficulty: c.difficulty, endless: c.endless, endlessShift: c.endlessShift },
     regiments: b.regiments.filter((r) => r.state !== "gone" && r.alive.length).map((r) => ({
       id: r.id, team: r.team, name: r.name, kind: r.type.kind, x: r.x, z: r.z, facing: r.facing, files: r.files,
       size: r.size, morale: r.morale, state: r.state, plundering: r.plundering, withdrawing: r.withdrawing,
@@ -112,6 +112,9 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   c.plunderTime = d.campaign.plunderTime;
   c.withdrawTime = d.campaign.withdrawTime;
   cc.levyCount = { spear: 0, archer: 0, ...d.campaign.levyCount };
+  c.difficulty = d.campaign.difficulty ?? "normal";
+  c.endless = !!d.campaign.endless;
+  c.endlessShift = d.campaign.endlessShift ?? 0;
   c.raiders = b.regiments.filter((r) => r.team === 1);
   v.event("Partida cargada", "info");
 }

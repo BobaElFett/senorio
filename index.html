@@ -120,6 +120,7 @@
   #v-banner[data-kind="warn"] { border-color: var(--warn); color: #f6dca0; }
   #v-banner[data-kind="raid"], #v-banner[data-kind="bad"] { border-color: var(--bad); color: #f7c2bb; }
   #v-banner[data-kind="good"] { border-color: var(--good); color: #c9ecd1; }
+  #v-banner button { font: inherit; font-weight: 600; margin-left: 12px; background: var(--gold); color: #2a2210; border: 0; border-radius: 4px; padding: 5px 12px; cursor: pointer; }
   #v-cards { position: fixed; left: 50%; bottom: 94px; transform: translateX(-50%); display: flex; gap: 8px; }
   .card[role="button"] { cursor: pointer; }
   .card[role="button"]:hover { border-color: rgba(255,255,255,.35); }
@@ -184,6 +185,13 @@
       <p>La partida guardada se sustituirá en cuanto la nueva se guarde.</p>
       <button type="button" id="m-confirm-yes" class="primary">Sí, partida nueva</button>
       <button type="button" id="m-confirm-no">Cancelar</button>
+    </div>
+    <div id="menu-difficulty" class="menu-list" hidden>
+      <h2>Dificultad</h2>
+      <button type="button" class="diff" data-diff="facil">Fácil<span class="m-sub">Bandidos menos numerosos y seis días más tarde. Para aprender.</span></button>
+      <button type="button" class="diff primary" data-diff="normal">Normal<span class="m-sub">La partida tal como está pensada.</span></button>
+      <button type="button" class="diff" data-diff="dificil">Difícil<span class="m-sub">Un 30% más de bandidos y cuatro días antes.</span></button>
+      <button type="button" id="m-diff-back">Volver</button>
     </div>
     <div id="menu-settings" class="menu-list" hidden>
       <h2>Ajustes</h2>
@@ -253,7 +261,7 @@
 <div id="v-build" class="panel village-only"></div>
 <div id="v-panel" class="panel village-only" hidden></div>
 <div id="v-toasts" class="village-only"></div>
-<div id="v-banner" class="panel village-only" hidden><span id="v-banner-text"></span></div>
+<div id="v-banner" class="panel village-only" hidden><span id="v-banner-text"></span><button type="button" id="v-banner-btn" hidden></button></div>
 <div id="v-cards" class="village-only"></div>
 <div id="v-enemies" class="village-only"></div>
 

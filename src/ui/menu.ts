@@ -3,7 +3,7 @@ import { readSave } from "../core/save";
 
 export interface MenuActions {
   continueGame(): void;   // cargar la partida guardada
-  newGame(): void;
+  newGame(difficulty: string): void;
   saveGame(): boolean;
   testBattle(): void;
   resume(): void;
@@ -19,14 +19,18 @@ const $ = (id: string) => document.getElementById(id)!;
 export class Menu {
   isOpen = false;
   private root = $("menu");
-  private screens = ["menu-main", "menu-confirm", "menu-settings", "menu-howto"];
+  private screens = ["menu-main", "menu-confirm", "menu-difficulty", "menu-settings", "menu-howto"];
 
   constructor(private actions: MenuActions, private settings: Settings, private inGame: () => boolean) {
     $("m-continue").onclick = () => this.actions.continueGame();
     $("m-new").onclick = () => {
-      if (this.inGame() || readSave()) this.show("menu-confirm"); else this.actions.newGame();
+      if (this.inGame() || readSave()) this.show("menu-confirm"); else this.show("menu-difficulty");
     };
-    $("m-confirm-yes").onclick = () => this.actions.newGame();
+    $("m-confirm-yes").onclick = () => this.show("menu-difficulty");
+    $("m-diff-back").onclick = () => this.show("menu-main");
+    document.querySelectorAll<HTMLButtonElement>("#menu-difficulty .diff").forEach((b) => {
+      b.onclick = () => this.actions.newGame(b.dataset.diff!);
+    });
     $("m-confirm-no").onclick = () => this.show("menu-main");
     $("m-save").onclick = () => {
       const ok = this.actions.saveGame();

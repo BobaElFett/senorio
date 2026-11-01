@@ -26,7 +26,7 @@ export class Hud {
    * En la aldea, `campaign` aporta el aviso de incursión y el botón de licenciar.
    */
   constructor(private battle: Battle, private controls: Controls, private actions: { start(): void; restart(): void },
-    prefix = "", private campaign?: { banner(): { text: string; kind: string } | null; disband(r: Regiment): void }) {
+    prefix = "", private campaign?: { banner(): { text: string; kind: string; action?: { label: string; run(): void } } | null; disband(r: Regiment): void }) {
     const $ = (id: string) => document.getElementById(prefix + id);
     this.bar = $("cards")!;
     this.enemyList = $("enemies")!;
@@ -34,7 +34,7 @@ export class Hud {
     this.bannerText = $("banner-text")!;
     this.bannerBtn = $("banner-btn") as HTMLButtonElement | null;
     this.status = $("status");
-    this.bannerBtn?.addEventListener("click", () => {
+    if (!campaign) this.bannerBtn?.addEventListener("click", () => {
       if (this.battle.result !== null) this.actions.restart(); else this.actions.start();
       this.bannerBtn!.blur();
     });
@@ -145,6 +145,11 @@ export class Hud {
       const info = this.campaign.banner();
       this.banner.hidden = !info;
       if (info) { this.banner.dataset.kind = info.kind; this.bannerText.textContent = info.text; }
+      if (this.bannerBtn) {
+        const act = info?.action;
+        this.bannerBtn.hidden = !act;
+        if (act) { this.bannerBtn.textContent = act.label; this.bannerBtn.onclick = () => { act.run(); this.bannerBtn!.blur(); }; }
+      }
       return;
     }
     if (b.result !== null) {
