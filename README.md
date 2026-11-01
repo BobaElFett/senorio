@@ -17,6 +17,7 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Modo libre**: tras la tercera incursión, botón para seguir jugando con incursiones cada 20 días y cada vez mayores.
 - **Primeros pasos**: ocho objetivos guiados con consejo (casa, trabajadores, segunda granja, mercado, cuartel, leva, primera incursión, invierno). Se pueden ocultar y se guardan con la partida.
 - **Cadena del pan**: el **molino** (8 madera, 5 monedas) muele 4 de grano al día en harina sin tocar los últimos 10; la **panadería** (6 madera, 10 monedas) convierte 3 de harina en 5 de pan. Se come primero el pan; si más de la mitad de lo que se come es pan, **+8 de aprobación**.
+- **Equipo guardado en el cuartel**: al licenciar un regimiento su equipo vuelve al cuartel y la siguiente leva no lo paga otra vez (si el regimiento huye, el equipo se pierde).
 - **Animación al andar** para soldados y aldeanos; aldeanos con cabeza y túnica del color de su oficio.
 - Barra superior en dos filas y avisos a la derecha.
 

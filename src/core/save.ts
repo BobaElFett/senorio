@@ -21,7 +21,7 @@ export interface SaveData {
   savedAt: number;
   summary: string;
   village: {
-    day: number; res: Village["res"]; approval: number; mods: Village["mods"];
+    day: number; res: Village["res"]; approval: number; mods: Village["mods"]; equipment?: Village["equipment"];
     nextId: number; nameIdx: number;
     buildings: { id: number; kind: BuildingKind; x: number; z: number; rot: number; built: boolean; progress: number; cutAcc: number }[];
     families: { id: number; name: string; home: number | null; work: number | null; prev: number | null; members: number; levied: number | null; x: number; z: number }[];
@@ -44,7 +44,7 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
     savedAt: Date.now(),
     summary: `${summarize(v)} · ${c.difficulty === "facil" ? "fácil" : c.difficulty === "dificil" ? "difícil" : "normal"}`,
     village: {
-      day: v.day, res: { ...v.res }, approval: v.approval, mods: v.mods.map((m) => ({ ...m })),
+      day: v.day, res: { ...v.res }, approval: v.approval, mods: v.mods.map((m) => ({ ...m })), equipment: { ...v.equipment },
       nextId: vv.nextId, nameIdx: vv.nameIdx,
       buildings: v.buildings.map((x) => ({ id: x.id, kind: x.type.kind, x: x.x, z: x.z, rot: x.rot, built: x.built, progress: x.progress, cutAcc: x.cutAcc })),
       families: v.families.map((f) => ({
@@ -71,6 +71,7 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   v.res = Object.assign({ wood: 0, food: 0, coins: 0, flour: 0, bread: 0 }, d.village.res);
   v.approval = v.approvalTarget = d.village.approval;
   v.mods = d.village.mods.map((m) => ({ ...m }));
+  v.equipment = { spear: 0, archer: 0, ...(d.village.equipment ?? {}) };
   const byId = new Map<number, Building>();
   for (const s of d.village.buildings) {
     const bld: Building = vv.addBuilding(s.kind, s.x, s.z, s.rot, s.built);

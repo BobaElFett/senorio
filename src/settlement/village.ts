@@ -87,6 +87,8 @@ export class Village {
   hungry = false;
   cold = false;
   underAttack = false;               // durante un saqueo no se trabaja
+  /** Equipos guardados en el cuartel (por familia) de regimientos licenciados. */
+  equipment: Record<LevyKind, number> = { spear: 0, archer: 0 };
   mods: Modifier[] = [];
   version = 0;
   private nextId = 1;
@@ -441,24 +443,28 @@ export class Village {
 
   // ------------------------------------------------------------ leva
   /** Familias que irían a la leva (primero las que no trabajan) y su coste. */
-  levyPlan(kind: LevyKind): { families: Family[]; wood: number; coins: number; ok: boolean; reason: string } {
+  levyPlan(kind: LevyKind): { families: Family[]; wood: number; coins: number; ok: boolean; reason: string; reused: number } {
     const spec = LEVY[kind];
     const pool = this.atHome.filter((f) => f.members > 0)
       .sort((a, b) => (a.work ? 1 : 0) - (b.work ? 1 : 0));
     const families = pool.slice(0, spec.maxFamilies);
-    const wood = families.length * spec.wood, coins = families.length * spec.coins;
+    // Solo se paga el equipo de las familias que no encuentran uno guardado en el cuartel
+    const reused = Math.min(this.equipment[kind], families.length);
+    const buy = families.length - reused;
+    const wood = buy * spec.wood, coins = buy * spec.coins;
     let reason = "";
     if (!this.has("barracks")) reason = "Hace falta un cuartel terminado";
     else if (families.length < MIN_LEVY) reason = `Hacen falta al menos ${MIN_LEVY} familias en casa`;
     else if (this.res.wood < wood) reason = `Falta madera (${wood})`;
     else if (this.res.coins < coins) reason = `Faltan monedas (${coins})`;
-    return { families, wood, coins, ok: !reason, reason };
+    return { families, wood, coins, ok: !reason, reason, reused };
   }
 
   /** Aparta a las familias de su trabajo; quedan ligadas al regimiento `regId`. */
   applyLevy(kind: LevyKind, families: Family[], regId: number) {
     const plan = this.levyPlan(kind);
     this.res.wood -= plan.wood; this.res.coins -= plan.coins;
+    this.equipment[kind] -= Math.min(this.equipment[kind], families.length);
     for (const f of families) {
       f.prevWork = f.work;
       if (f.work) { f.work.workers.splice(f.work.workers.indexOf(f), 1); f.work = null; }
@@ -481,9 +487,11 @@ export class Village {
   }
 
   /** Los supervivientes del regimiento vuelven a casa. */
-  returnFromLevy(regId: number, at: P) {
+  /** `kind`: si el regimiento se licencia en orden, su equipo vuelve al cuartel. */
+  returnFromLevy(regId: number, at: P, kind?: LevyKind) {
     for (const f of this.families) {
       if (f.levied !== regId) continue;
+      if (kind) this.equipment[kind]++;
       f.levied = null;
       f.v.x = at.x + (Math.random() - 0.5) * 4; f.v.z = at.z + (Math.random() - 0.5) * 4;
       f.v.goalKey = ""; f.v.visible = true; f.v.path = [];

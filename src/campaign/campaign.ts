@@ -136,7 +136,7 @@ export class Campaign {
   /** Licenciar: los supervivientes vuelven a casa y a trabajar. */
   disband(r: Regiment) {
     if (r.team !== 0 || r.engaged) return;
-    this.village.returnFromLevy(r.id, { x: r.cx, z: r.cz });
+    this.village.returnFromLevy(r.id, { x: r.cx, z: r.cz }, r.type.kind === "archer" ? "archer" : "spear");
     this.battle.removeRegiment(r);
     this.village.event(`${r.name} se licencia: ${r.count} hombres vuelven a casa`, "info");
   }

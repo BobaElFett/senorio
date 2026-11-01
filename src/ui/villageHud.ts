@@ -124,7 +124,7 @@ export class VillageHud {
     if (!b) { this.panel.hidden = true; this.panelFor = null; return; }
     this.panel.hidden = false;
     // Reconstruir solo si cambia el edificio; si no, actualizar textos
-    const levyKey = b.type.kind === "barracks" ? (["spear", "archer"] as LevyKind[]).map((k) => { const p = this.v.levyPlan(k); return `${p.ok}${p.families.length}${p.reason}`; }).join("|") : "";
+    const levyKey = b.type.kind === "barracks" ? (["spear", "archer"] as LevyKind[]).map((k) => { const p = this.v.levyPlan(k); return `${p.ok}${p.families.length}${p.reason}${p.reused}`; }).join("|") : "";
     const key = `${b.id}-${b.built}-${b.workers.length}-${b.residents.length}-${this.v.idle.length}-${Math.floor(b.progress * 100)}-${this.v.season}-${levyKey}`;
     if (this.panelFor === b && this.panel.dataset.key === key) return;
     this.panelFor = b;
@@ -179,19 +179,20 @@ export class VillageHud {
       } else if (t.kind === "house") {
         items.push(el("div", "p-row", b.residents.length ? `Vive la familia ${b.residents[0].name}` : "Vacía: llegará una familia si la aprobación es de 50% o más"));
       } else if (t.kind === "barracks") {
-        items.push(el("div", "p-row", "Leva: cada familia aporta 4 hombres. Mientras sirven no trabajan, pero siguen comiendo."));
+        items.push(el("div", "p-row", "Leva: cada familia aporta 4 hombres. Mientras sirven no trabajan, pero siguen comiendo. Al licenciar, el equipo vuelve al cuartel; si huyen, se pierde."));
         for (const kind of ["spear", "archer"] as LevyKind[]) {
           const plan = v.levyPlan(kind);
           const btn = el("button", "levy-btn");
           btn.type = "button";
           const men = plan.families.reduce((s, f) => s + Math.min(4, f.members), 0);
           btn.append(el("span", "levy-name", `Reclutar ${LEVY[kind].label.toLowerCase()}`),
-            el("span", "levy-cost", plan.families.length ? `${plan.families.length} familias · ${men} hombres · ${plan.wood} madera · ${plan.coins} monedas` : "Nadie disponible"));
+            el("span", "levy-cost", plan.families.length ? `${plan.families.length} familias · ${men} hombres · ${plan.wood} madera · ${plan.coins} monedas${plan.reused ? ` (${plan.reused} equipos guardados)` : ""}` : "Nadie disponible"));
           btn.disabled = !plan.ok;
           if (!plan.ok) btn.append(el("span", "levy-why", plan.reason));
           btn.onclick = () => { this.levy(kind); this.invalidate(); };
           items.push(btn);
         }
+        if (v.equipment.spear + v.equipment.archer) items.push(el("p", "p-note", `Equipo guardado: ${v.equipment.spear} de lanceros y ${v.equipment.archer} de arqueros (por familia). Lo usan las próximas levas sin coste.`));
         const levied = v.families.filter((f) => f.levied !== null).length;
         if (levied) items.push(el("p", "p-note", `${levied} familias sirven en la leva. Licencia los regimientos desde su tarjeta para que vuelvan a trabajar.`));
       }
