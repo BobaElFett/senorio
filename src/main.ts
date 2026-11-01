@@ -107,6 +107,7 @@ const objectives = new Objectives(village, campaign, battle, (title) => {
 let inGame = false;
 let menuPaused = false;
 function beginNew(difficulty: Difficulty = "normal") {
+  if (mode !== "village") { mode = "battle"; inGame = true; setMode("village"); inGame = false; }
   campaign.difficulty = difficulty;
   village.setup();
   if (difficulty !== "normal") village.event(`Dificultad: ${DIFFICULTY[difficulty].label.toLowerCase()}`, "info");
@@ -116,6 +117,7 @@ function beginNew(difficulty: Difficulty = "normal") {
 function beginFromSave(): boolean {
   const d = readSave();
   if (!d) return false;
+  if (mode !== "village") { inGame = true; setMode("village"); inGame = false; }
   restore(d, village, forest, campaign, battle);
   for (const id of d.objectives ?? []) objectives.done.add(id);
   objectives.collapsed = !!d.objectivesCollapsed;

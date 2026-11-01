@@ -23,6 +23,9 @@ export class BattleView {
   private heads = new Map<string, THREE.InstancedMesh>();
   private headIndex = new Map<Soldier, [THREE.InstancedMesh, number]>();
   private bows!: THREE.InstancedMesh;
+  private legs: THREE.InstancedMesh[] = [];
+  private legM = new THREE.Matrix4();
+  private hip = new THREE.Matrix4();
   private bowIndex = new Map<Soldier, number>();
   private spears!: THREE.InstancedMesh;
   private spearIndex = new Map<Soldier, number>();
@@ -61,8 +64,9 @@ export class BattleView {
     this.outlines.clear();
     this.spearIndex.clear();
 
-    const body = new THREE.CylinderGeometry(0.22, 0.28, 1.15, 6);
-    body.translate(0, 0.575, 0);
+    // Torso (las piernas van aparte para poder moverlas al andar)
+    const body = new THREE.CylinderGeometry(0.22, 0.27, 0.66, 6);
+    body.translate(0, 0.86, 0);
     const shield = new THREE.BoxGeometry(0.5, 0.65, 0.07);
     shield.translate(-0.12, 0.75, 0.3);
     const soldierGeo = mergeGeometries([body.toNonIndexed(), shield.toNonIndexed()])!;
@@ -78,6 +82,16 @@ export class BattleView {
     this.spears = new THREE.InstancedMesh(spearGeo, new THREE.MeshStandardMaterial({ color: "#7a6044", flatShading: true }), Math.max(1, spearHolders.length));
     this.spears.frustumCulled = false;
     this.group.add(this.bodies, this.spears);
+
+    const legGeo = new THREE.BoxGeometry(0.15, 0.58, 0.17);
+    legGeo.translate(0, -0.29, 0);
+    const legMat = new THREE.MeshStandardMaterial({ color: "#3a3128", flatShading: true });
+    this.legs = [0, 1].map(() => {
+      const m = new THREE.InstancedMesh(legGeo, legMat, b.soldiers.length);
+      m.castShadow = true; m.frustumCulled = false;
+      this.group.add(m);
+      return m;
+    });
 
     // Cabezas con su tocado según el tipo: yelmo (lanceros), capucha (arqueros), gorro (milicia)
     const paint = (g: THREE.BufferGeometry, hex: string) => {
@@ -199,6 +213,14 @@ export class BattleView {
         this.m.compose(this.v.set(s.x + fx, s.y + bob, s.z + fz), this.q, this.sc.set(1, 1, 1));
       }
       this.bodies.setMatrixAt(i, this.m);
+      // Piernas: balanceo al andar, quietas en formación
+      const speed = Math.hypot(s.vx, s.vz);
+      const swing = s.alive && !s.fled ? Math.sin(s.bob * 2) * Math.min(1, speed / 2.5) * 0.65 : 0;
+      for (let side = 0; side < 2; side++) {
+        this.hip.makeRotationX(side ? swing : -swing).setPosition(side ? 0.11 : -0.11, 0.6, 0);
+        this.legM.multiplyMatrices(this.m, this.hip);
+        this.legs[side].setMatrixAt(i, this.legM);
+      }
       this.c.set(TEAM_COLORS[`${s.reg.team}-${k}`]);
       if (!s.alive) this.c.lerp(CORPSE, 0.55);
       else if (s.reg.state === "routing") this.c.lerp(new THREE.Color("#c9c3b5"), 0.45);
@@ -218,6 +240,7 @@ export class BattleView {
     if (this.bodies.instanceColor) this.bodies.instanceColor.needsUpdate = true;
     this.spears.instanceMatrix.needsUpdate = true;
     this.bows.instanceMatrix.needsUpdate = true;
+    for (const l of this.legs) l.instanceMatrix.needsUpdate = true;
     for (const h of this.heads.values()) h.instanceMatrix.needsUpdate = true;
 
     // Estandartes: más grandes de lejos para que se lean siempre

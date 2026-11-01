@@ -27,6 +27,10 @@ export class VillageView {
   readonly group = new THREE.Group();
   private views = new Map<Building, BView>();
   private villagers: THREE.InstancedMesh;
+  private vHeads: THREE.InstancedMesh;
+  private vLegs: THREE.InstancedMesh[];
+  private hip = new THREE.Matrix4();
+  private legM = new THREE.Matrix4();
   private ghost: THREE.Group | null = null;
   private ghostKind: BuildingKind | null = null;
   private ghostField: THREE.LineLoop;
@@ -41,16 +45,22 @@ export class VillageView {
 
   constructor(scene: THREE.Scene, private terrain: Terrain) {
     scene.add(this.group);
-    const body = new THREE.CylinderGeometry(0.2, 0.26, 1.05, 6).toNonIndexed();
-    body.translate(0, 0.525, 0);
-    const head = new THREE.IcosahedronGeometry(0.18, 0).toNonIndexed();
-    head.translate(0, 1.24, 0);
-    const geo = mergeGeometries([body, head])!;
-    geo.computeVertexNormals();
-    this.villagers = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ flatShading: true }), 400);
-    this.villagers.castShadow = true;
-    this.villagers.frustumCulled = false;
-    this.group.add(this.villagers);
+    // Aldeano: túnica del color de su oficio, cabeza y piernas aparte
+    const body = new THREE.CylinderGeometry(0.19, 0.27, 0.6, 6);
+    body.translate(0, 0.83, 0);
+    body.computeVertexNormals();
+    this.villagers = new THREE.InstancedMesh(body, new THREE.MeshStandardMaterial({ flatShading: true }), 400);
+    const head = new THREE.IcosahedronGeometry(0.17, 0);
+    head.translate(0, 1.27, 0);
+    this.vHeads = new THREE.InstancedMesh(head, new THREE.MeshStandardMaterial({ color: "#d6aa84", flatShading: true }), 400);
+    const leg = new THREE.BoxGeometry(0.13, 0.54, 0.15);
+    leg.translate(0, -0.27, 0);
+    const legMat = new THREE.MeshStandardMaterial({ color: "#4a3c2e", flatShading: true });
+    this.vLegs = [0, 1].map(() => new THREE.InstancedMesh(leg, legMat, 400));
+    for (const m of [this.villagers, this.vHeads, ...this.vLegs]) {
+      m.castShadow = true; m.frustumCulled = false; m.count = 0;
+      this.group.add(m);
+    }
     this.outline = this.makeLoop("#ffe39a");
     this.ghostField = this.makeLoop("#ffffff");
     this.group.add(this.outline, this.ghostField);
@@ -179,12 +189,18 @@ export class VillageView {
       this.q.setFromEuler(this.e);
       this.m.compose(new THREE.Vector3(a.x, a.y + bob, a.z), this.q, new THREE.Vector3(1, 1, 1));
       this.villagers.setMatrixAt(i, this.m);
+      this.vHeads.setMatrixAt(i, this.m);
+      const swing = a.path.length ? Math.sin(a.anim) * 0.6 : 0;
+      for (let side = 0; side < 2; side++) {
+        this.hip.makeRotationX(side ? swing : -swing).setPosition(side ? 0.1 : -0.1, 0.56, 0);
+        this.legM.multiplyMatrices(this.m, this.hip);
+        this.vLegs[side].setMatrixAt(i, this.legM);
+      }
       const job = f.work ? f.work.type.kind : f.site ? "builder" : "idle";
       this.villagers.setColorAt(i, this.c.set(JOB_COLOR[job] ?? JOB_COLOR.idle));
       i++;
     }
-    this.villagers.count = i;
-    this.villagers.instanceMatrix.needsUpdate = true;
+    for (const m of [this.villagers, this.vHeads, ...this.vLegs]) { m.count = i; m.instanceMatrix.needsUpdate = true; }
     if (this.villagers.instanceColor) this.villagers.instanceColor.needsUpdate = true;
 
     // Selección

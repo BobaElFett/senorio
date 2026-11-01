@@ -447,7 +447,7 @@ export class Battle {
     s.y = Math.max(-0.4, this.terrain.heightAt(s.x, s.z));
 
     const speed = Math.hypot(s.vx, s.vz);
-    s.bob += speed * dt * 2.2;
+    s.bob += speed * dt * 1.6;
     let want = r.facing;
     if (s.target) want = Math.atan2(s.target.x - s.x, s.target.z - s.z);
     else if (speed > 0.6) want = Math.atan2(s.vx, s.vz);
