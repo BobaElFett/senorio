@@ -10,7 +10,7 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Guardado:** automático al empezar cada día y al cerrar la pestaña; también *Guardar partida* en el menú. Se guarda en el navegador (una partida).
 - **Ajustes:** volumen general, música y efectos; mover la cámara con el ratón en el borde; mostrar la ayuda.
 - **Sonido:** todo sintetizado en tiempo real (sin archivos): choques de armas, flechas, cargas, cuerno de alarma, campanas, martillos, viento, pájaros y grillos, música de laúd y tambores en las incursiones. Suena tras el primer clic.
-- **Publicar:** la carpeta `itch/` tiene el zip para itch.io, portada, capturas y la guía `PUBLICAR-EN-ITCH.md`.
+- **Compartir:** el juego es un único archivo (`dist/index.html`); también hay una versión jugable con enlace en claude.ai.
 
 ## Novedades 0.6 (noche del 1 al 2 de noviembre)
 - **Dificultad** al empezar: fácil (bandidos −25% y 6 días más tarde), normal o difícil (+30% y 4 días antes).
