@@ -29,6 +29,8 @@ export interface SaveData {
   felled: number[];
   campaign: { raidIndex: number; phase: Phase; results: Campaign["results"]; plunderTime: number; withdrawTime: number; levyCount: Record<string, number>; difficulty?: Campaign["difficulty"]; endless?: boolean; endlessShift?: number };
   regiments: SavedRegiment[];
+  objectives?: string[];
+  objectivesCollapsed?: boolean;
 }
 
 export function summarize(v: Village): string {

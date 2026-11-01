@@ -19,6 +19,7 @@ import { loadSettings, Settings } from "./core/settings";
 import { Menu } from "./ui/menu";
 import { GameAudio } from "./audio/audio";
 import { Particles } from "./world/particles";
+import { Objectives } from "./ui/objectives";
 
 type Mode = "village" | "battle";
 
@@ -97,6 +98,11 @@ const testControls = new Controls(renderer.domElement, rts, terrain, testBattle,
 const testHud = new Hud(testBattle, testControls, { start: () => testBattle.start(), restart: resetBattle });
 testBattle.onEvent = (kind, x, z) => soundFor(kind, x, z);
 
+// Objetivos de la primera partida
+const objectives = new Objectives(village, campaign, battle, (title) => {
+  village.event(`Objetivo cumplido: ${title.toLowerCase()}`, "good");
+});
+
 // --- Partida: empezar, cargar y guardar ----------------------------------
 let inGame = false;
 let menuPaused = false;
@@ -111,6 +117,8 @@ function beginFromSave(): boolean {
   const d = readSave();
   if (!d) return false;
   restore(d, village, forest, campaign, battle);
+  for (const id of d.objectives ?? []) objectives.done.add(id);
+  objectives.collapsed = !!d.objectivesCollapsed;
   inGame = true;
   const store = village.buildings.find((b) => b.type.kind === "storehouse");
   rts.setView(store ? store.x + 4 : 4, store ? store.z + 30 : 30, 0.5, 105);
@@ -118,7 +126,10 @@ function beginFromSave(): boolean {
 }
 function saveNow(): boolean {
   if (!inGame) return false;
-  return writeSave(serialize(village, forest, campaign, battle));
+  const data = serialize(village, forest, campaign, battle);
+  data.objectives = [...objectives.done];
+  data.objectivesCollapsed = objectives.collapsed;
+  return writeSave(data);
 }
 // Partida nueva o carga a mitad de partida: se recarga la página para partir de un mundo limpio
 function restartWith(flag: "new" | "continue", difficulty?: string) {
@@ -337,6 +348,7 @@ renderer.setAnimationLoop(() => {
     applyAtmosphere(lights, terrain, forest, village.hour, village.seasonFloat);
     battleView.update(battle, rts.camera, controls.selected, controls.previews, true);
     vHud.update(dt, paused, speed);
+    objectives.update(dt, inGame);
     hud.update(dt, paused, speed);
   }
   villageView.update(village, mode === "village" ? vControls.selected : null, dt);
