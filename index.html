@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Señorío</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&display=swap">
+<style>
+  :root {
+    --panel: rgba(26, 31, 28, .82); --ink: #eef2ec; --dim: #b3bdb2; --line: rgba(255,255,255,.12);
+    --blue: #4a78d0; --red: #c2483a; --gold: #f0c869; --good: #79c08a; --warn: #e8b04a; --bad: #e0675a;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #b9d3df; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  .panel { position: fixed; background: var(--panel); border-radius: 6px; font-size: 13px; line-height: 1.5; user-select: none; }
+  kbd { background: rgba(255,255,255,.14); border-radius: 3px; padding: 0 5px; font-family: inherit; font-size: 12px; }
+  [hidden] { display: none !important; }
+
+  #help { left: 12px; top: 12px; padding: 10px 14px; max-width: 300px; }
+  #help h1 { font-size: 15px; margin: 0 0 6px; letter-spacing: .04em; }
+  #help h2 { font-size: 11px; margin: 8px 0 2px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); font-weight: 600; }
+  #help p { margin: 1px 0; }
+  #help .dim { color: var(--dim); margin-top: 6px; }
+
+  #topright { position: fixed; right: 12px; top: 12px; display: grid; gap: 8px; justify-items: end; }
+  #topright .panel { position: static; }
+  #fps, #status { padding: 3px 10px; font-variant-numeric: tabular-nums; }
+  #enemies { display: grid; gap: 6px; width: 210px; }
+  #v-enemies { position: fixed; left: 50%; top: 130px; transform: translateX(-50%); display: flex; gap: 8px; }
+  #v-enemies .card { width: 170px; }
+
+  #banner { left: 50%; top: 14px; transform: translateX(-50%); padding: 10px 16px; display: flex; gap: 14px; align-items: center; font-size: 14px; border: 1px solid var(--line); }
+  #banner[data-kind="win"] { border-color: var(--good); }
+  #banner[data-kind="lose"] { border-color: var(--bad); }
+  #banner button { font: inherit; font-weight: 600; background: var(--gold); color: #2a2210; border: 0; border-radius: 4px; padding: 6px 14px; cursor: pointer; }
+  #banner button:hover { filter: brightness(1.08); }
+
+  #cards { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 8px; }
+  .card { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 190px; text-align: left; font: inherit; font-size: 12px; display: grid; gap: 4px; }
+  button.card { cursor: pointer; }
+  button.card:hover { border-color: rgba(255,255,255,.35); }
+  .card.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .card.team0 { border-top: 3px solid var(--blue); }
+  .card.team1 { border-top: 3px solid var(--red); padding: 6px 9px; }
+  .card[data-state="gone"], .card[data-state="routing"] { opacity: .55; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .card-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-meta, .card-foot { display: flex; justify-content: space-between; color: var(--dim); }
+  .num { font-variant-numeric: tabular-nums; color: var(--ink); }
+  .morale { height: 5px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+  .morale i { display: block; height: 100%; background: var(--good); transition: width .2s; }
+  .card[data-state="wavering"] .morale i { background: var(--warn); }
+  .card[data-state="routing"] .morale i { background: var(--bad); }
+  .state { font-weight: 600; color: var(--good); }
+  .card[data-state="wavering"] .state { color: var(--warn); }
+  .card[data-state="routing"] .state, .card[data-state="gone"] .state { color: var(--bad); }
+  .order { color: var(--dim); }
+
+
+  body[data-mode="village"] .battle-only, body[data-mode="battle"] .village-only { display: none !important; }
+
+  #modebar { position: fixed; left: 12px; top: 12px; display: flex; padding: 3px; gap: 3px; z-index: 4; }
+  #modebar button { font: inherit; font-size: 13px; background: transparent; color: var(--dim); border: 0; border-radius: 4px; padding: 5px 12px; cursor: pointer; }
+  #modebar button.active { background: rgba(255,255,255,.14); color: var(--ink); font-weight: 600; }
+  #modebar button:hover { color: var(--ink); }
+  #help { top: 56px; }
+
+  #v-top { left: 50%; top: 12px; transform: translateX(-50%); padding: 8px 14px 6px; display: grid; gap: 4px; justify-items: center; }
+  #v-top .row { display: flex; gap: 18px; align-items: baseline; }
+  #v-res { display: flex; gap: 18px; }
+  .res { display: flex; gap: 5px; align-items: baseline; white-space: nowrap; }
+  .res-label { color: var(--dim); font-size: 12px; }
+  .res-val { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .res-cap { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .res-rate { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .res-rate.pos { color: var(--good); } .res-rate.neg { color: var(--bad); }
+  .res.warn .res-val { color: var(--bad); }
+  #v-appr { position: relative; cursor: default; }
+  #v-appr[data-level="good"] .res-val { color: var(--good); }
+  #v-appr[data-level="mid"] .res-val { color: var(--warn); }
+  #v-appr[data-level="bad"] .res-val { color: var(--bad); }
+  #v-appr-list { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); background: rgba(22,27,24,.95); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 230px; display: none; z-index: 6; }
+  #v-appr:hover #v-appr-list { display: grid; gap: 3px; }
+  .f-row { display: flex; justify-content: space-between; font-size: 12px; }
+  .f-row .pos { color: var(--good); } .f-row .neg { color: var(--bad); }
+  .f-note { color: var(--dim); font-size: 11px; margin-top: 4px; }
+  #v-date { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  #v-build { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; }
+  .build-btn { font: inherit; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 6px 12px; cursor: pointer; display: grid; text-align: left; min-width: 96px; }
+  .build-btn:hover { border-color: rgba(255,255,255,.4); }
+  .build-btn.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .build-btn.cant .build-cost { color: var(--bad); }
+  .build-name { font-weight: 600; font-size: 13px; }
+  .build-cost { font-size: 11px; color: var(--dim); }
+
+  #v-panel { right: 12px; top: 56px; width: 260px; padding: 12px 14px; display: grid; gap: 6px; }
+  #v-panel h3 { margin: 0; font-size: 15px; }
+  .p-desc, .p-note { margin: 0; color: var(--dim); font-size: 12px; }
+  .p-note.neg { color: var(--bad); }
+  .p-row { font-size: 13px; }
+  .p-bar { height: 6px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+  .p-bar i { display: block; height: 100%; background: var(--gold); }
+  .p-workers { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .p-workers > span:first-child { flex: 1; }
+  .w-btn { font: inherit; font-weight: 700; width: 28px; height: 26px; background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+  .w-btn:disabled { opacity: .35; cursor: default; }
+  .w-count { font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; font-weight: 600; }
+  .p-del { font: inherit; font-size: 12px; margin-top: 4px; background: transparent; color: var(--bad); border: 1px solid rgba(224,103,90,.5); border-radius: 4px; padding: 5px; cursor: pointer; }
+  .p-del:disabled { opacity: .4; cursor: default; }
+
+  #v-toasts { position: fixed; left: 12px; bottom: 12px; display: flex; flex-direction: column-reverse; gap: 6px; max-width: 320px; }
+  .toast { background: var(--panel); border-left: 3px solid var(--dim); border-radius: 4px; padding: 6px 10px; font-size: 13px; transition: opacity .8s; }
+  .toast.good { border-left-color: var(--good); } .toast.bad { border-left-color: var(--bad); }
+  .toast.fade { opacity: 0; }
+  .place-tip { position: fixed; background: rgba(160, 40, 30, .9); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 4px; pointer-events: none; z-index: 7; }
+  #v-banner { left: 50%; top: 86px; transform: translateX(-50%); padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); max-width: 640px; text-align: center; }
+  #v-banner[data-kind="warn"] { border-color: var(--warn); color: #f6dca0; }
+  #v-banner[data-kind="raid"], #v-banner[data-kind="bad"] { border-color: var(--bad); color: #f7c2bb; }
+  #v-banner[data-kind="good"] { border-color: var(--good); color: #c9ecd1; }
+  #v-cards { position: fixed; left: 50%; bottom: 94px; transform: translateX(-50%); display: flex; gap: 8px; }
+  .card[role="button"] { cursor: pointer; }
+  .card[role="button"]:hover { border-color: rgba(255,255,255,.35); }
+  .card.disabled { pointer-events: none; }
+  .disband { font: inherit; font-size: 11px; margin-top: 2px; background: transparent; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; cursor: pointer; justify-self: start; }
+  .disband:hover:not(:disabled) { color: var(--ink); border-color: rgba(255,255,255,.4); }
+  .disband:disabled { opacity: .4; cursor: default; }
+  .levy-btn { font: inherit; text-align: left; display: grid; gap: 1px; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+  .levy-btn:hover:not(:disabled) { border-color: var(--gold); }
+  .levy-btn:disabled { cursor: default; opacity: .7; }
+  .levy-name { font-weight: 600; font-size: 13px; }
+  .levy-cost { font-size: 11px; color: var(--dim); }
+  .levy-why { font-size: 11px; color: var(--bad); }
+
+  body[data-title="1"] .village-only, body[data-title="1"] #help, body[data-title="1"] #modebar { display: none !important; }
+  #menu { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(20,24,21,.35), rgba(12,15,13,.78)); }
+  .menu-card { width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: rgba(24,29,26,.94); border: 1px solid var(--line); border-radius: 10px; padding: 28px 30px 24px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  .menu-title { font-family: "Alegreya SC", Georgia, serif; font-size: 46px; font-weight: 700; letter-spacing: .04em; margin: 0; text-align: center; color: #f3e7c6; line-height: 1; }
+  .menu-tag { margin: -4px 0 6px; text-align: center; color: var(--dim); font-size: 14px; }
+  .menu-list { display: grid; gap: 8px; }
+  .menu-list button { font: inherit; font-size: 15px; text-align: left; background: rgba(255,255,255,.05); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 11px 14px; cursor: pointer; display: grid; gap: 2px; }
+  .menu-list button:hover { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.08); }
+  .menu-list button.primary { background: var(--gold); color: #2a2210; border-color: var(--gold); font-weight: 600; }
+  .menu-list button.primary .m-sub { color: #5a4a20; }
+  .m-sub { font-size: 12px; color: var(--dim); font-weight: 400; }
+  .menu-note { min-height: 18px; margin: 0; text-align: center; font-size: 13px; color: var(--good); }
+  .menu-card h2 { margin: 0; font-size: 18px; }
+  .menu-card p { margin: 0; line-height: 1.5; font-size: 14px; }
+  .set-row { display: grid; grid-template-columns: 120px 1fr 40px; align-items: center; gap: 10px; font-size: 14px; }
+  .set-row input[type=range] { width: 100%; accent-color: var(--gold); }
+  .set-check { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .set-check input { accent-color: var(--gold); width: 16px; height: 16px; }
+  .howto { display: grid; gap: 10px; font-size: 14px; }
+  .howto h3 { margin: 4px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+  .howto p { color: #dfe5dc; }
+  .menu-credit { text-align: center; font-size: 11px; color: var(--dim); margin: 2px 0 0; }
+
+  .select-box { position: fixed; border: 1px solid var(--gold); background: rgba(240, 200, 105, .12); pointer-events: none; z-index: 5; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="modebar" class="panel"><button type="button" id="menu-btn" title="Menú (M)">Menú</button><button type="button" data-mode="village">Aldea</button><button type="button" data-mode="battle">Batalla de prueba</button></div>
+
+<div id="menu" hidden>
+  <div class="menu-card">
+    <h1 class="menu-title">Señorío</h1>
+    <p class="menu-tag">Haz crecer la aldea. Defiéndela con sus propias familias.</p>
+    <div id="menu-main" class="menu-list">
+      <button type="button" id="m-resume">Volver al juego</button>
+      <button type="button" id="m-continue"><span id="m-continue-label">Continuar</span><span class="m-sub" id="m-continue-sub"></span></button>
+      <button type="button" id="m-new">Partida nueva<span class="m-sub">Primavera del año 1, cinco familias. Tres incursiones de bandidos.</span></button>
+      <button type="button" id="m-save">Guardar partida<span class="m-sub">También se guarda sola al empezar cada día.</span></button>
+      <button type="button" id="m-battle">Batalla de prueba<span class="m-sub">3 contra 3, aparte de la partida.</span></button>
+      <button type="button" id="m-settings">Ajustes</button>
+      <button type="button" id="m-howto">Cómo jugar</button>
+      <p class="menu-note" id="m-save-note"></p>
+    </div>
+    <div id="menu-confirm" class="menu-list" hidden>
+      <h2>¿Empezar una partida nueva?</h2>
+      <p>La partida guardada se sustituirá en cuanto la nueva se guarde.</p>
+      <button type="button" id="m-confirm-yes" class="primary">Sí, partida nueva</button>
+      <button type="button" id="m-confirm-no">Cancelar</button>
+    </div>
+    <div id="menu-settings" class="menu-list" hidden>
+      <h2>Ajustes</h2>
+      <label class="set-row" for="s-master">Volumen general <input id="s-master" type="range" min="0" max="100"><span></span></label>
+      <label class="set-row" for="s-music">Música <input id="s-music" type="range" min="0" max="100"><span></span></label>
+      <label class="set-row" for="s-sfx">Efectos y ambiente <input id="s-sfx" type="range" min="0" max="100"><span></span></label>
+      <label class="set-check" for="s-edge"><input id="s-edge" type="checkbox"> Mover la cámara con el ratón en el borde</label>
+      <label class="set-check" for="s-help"><input id="s-help" type="checkbox"> Mostrar el panel de ayuda</label>
+      <button type="button" id="m-settings-back">Volver</button>
+    </div>
+    <div id="menu-howto" class="menu-list" hidden>
+      <h2>Cómo jugar</h2>
+      <div class="howto">
+        <h3>La aldea</h3>
+        <p>Elige edificios en la barra de abajo y colócalos con clic izquierdo (R gira). Las familias sin trabajo construyen. Haz clic en un edificio para asignar trabajadores.</p>
+        <p>Cada familia come 0,8 al día. Las granjas no producen en invierno y las casas queman leña: guarda reservas. Con 50% de aprobación y casas libres llegan familias.</p>
+        <h3>La defensa</h3>
+        <p>Tres incursiones llegan por el oeste, con dos días de aviso. Construye un cuartel y recluta: cada familia aporta cuatro hombres, que no trabajan mientras sirven.</p>
+        <p>Clic o recuadro para elegir tropas, clic derecho para mover o atacar, arrastrar con clic derecho para trazar el frente. Los flancos y la retaguardia hunden la moral.</p>
+        <p>Cada caído es un hombre de una familia de la aldea. Licencia los regimientos al terminar para que vuelvan a trabajar.</p>
+        <h3>Teclas</h3>
+        <p>WASD cámara · Q/E girar · Espacio pausa · T velocidad · M menú · H ayuda · Tab batalla de prueba</p>
+      </div>
+      <button type="button" id="m-howto-back">Volver</button>
+    </div>
+    <p class="menu-credit">Prototipo 0.5 · Three.js · sonido y música generados en tiempo real</p>
+  </div>
+</div>
+
+<div id="help" class="panel">
+  <h1>Señorío · prototipo 0.5</h1>
+  <h2>Cámara</h2>
+  <p><kbd>W A S D</kbd> mover · ratón al borde (<kbd>B</kbd>: <span class="edge">activado</span>)</p>
+  <p>Rueda: zoom · <kbd>Q</kbd> <kbd>E</kbd> o botón central: girar</p>
+  <div class="village-only">
+    <h2>Aldea</h2>
+    <p>Barra de abajo: elegir edificio · clic izq.: colocar</p>
+    <p><kbd>R</kbd>: girar · clic der. o <kbd>Esc</kbd>: dejar de construir</p>
+    <p>Clic en un edificio: trabajadores y demoler</p>
+    <p>Las familias sin trabajo construyen las obras</p>
+    <h2>Defensa</h2>
+    <p>Cuartel: reclutar entre las familias</p>
+    <p>Tropas: clic, recuadro, <kbd>1</kbd>–<kbd>9</kbd> · clic der.: mover o atacar</p>
+    <p>Arrastrar clic der.: frente · <kbd>X</kbd>: alto</p>
+  </div>
+  <div class="battle-only">
+    <h2>Tropas</h2>
+    <p>Clic izq.: seleccionar · arrastrar: recuadro</p>
+    <p><kbd>1</kbd>–<kbd>3</kbd>, <kbd>Ctrl</kbd>+<kbd>A</kbd>: elegir · <kbd>Mayús</kbd>: añadir</p>
+    <p>Clic der.: mover · sobre enemigo: atacar</p>
+    <p>Arrastrar clic der.: trazar el frente · <kbd>X</kbd>: alto</p>
+    <p><kbd>Intro</kbd> empezar · <kbd>R</kbd> reiniciar</p>
+  </div>
+  <h2>Tiempo</h2>
+  <p><kbd>Espacio</kbd> pausa · <kbd>T</kbd> velocidad · <kbd>M</kbd> menú · <kbd>Tab</kbd> cambiar de modo</p>
+  <p class="dim"><kbd>H</kbd> oculta esta ayuda</p>
+</div>
+
+<div id="v-top" class="panel village-only">
+  <div class="row">
+    <div id="v-res"></div>
+    <div id="v-pop" class="res"></div>
+    <div id="v-appr" class="res"><span class="res-label">Aprobación</span><span class="res-val">–</span><span class="res-rate"></span><div id="v-appr-list"></div></div>
+  </div>
+  <div id="v-date"></div>
+</div>
+<div id="v-build" class="panel village-only"></div>
+<div id="v-panel" class="panel village-only" hidden></div>
+<div id="v-toasts" class="village-only"></div>
+<div id="v-banner" class="panel village-only" hidden><span id="v-banner-text"></span></div>
+<div id="v-cards" class="village-only"></div>
+<div id="v-enemies" class="village-only"></div>
+
+<div id="banner" class="panel battle-only" hidden><span id="banner-text"></span><button id="banner-btn" type="button"></button></div>
+
+<div id="topright">
+  <div id="fps" class="panel">– FPS</div>
+  <div id="status" class="panel battle-only"></div>
+  <div id="enemies" class="battle-only"></div>
+</div>
+
+<div id="cards" class="battle-only"></div>
+<!--BUNDLE-->
+</body>
+</html>
