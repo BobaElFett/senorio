@@ -15,6 +15,7 @@ interface BView {
 
 const JOB_COLOR: Record<string, string> = {
   woodcutter: "#7a5232", farm: "#5f8a3a", market: "#8a4fa0", storehouse: "#9a7a4a", builder: "#d98a2b", idle: "#8c8a84",
+  mill: "#c9c2b0", bakery: "#b5643a",
 };
 const FIELD_COLORS = ["#86a64a", "#a8b84c", "#d2b14c", "#8a6e4a"]; // primavera, verano, otoño, invierno
 
@@ -151,6 +152,10 @@ export class VillageView {
         else { bv.site = constructionModel(b.type.kind); bv.root.add(bv.site.group); }
       }
       if (bv.site) bv.site.walls.scale.y = Math.max(0.01, b.progress);
+      // Aspas del molino: giran mientras hay molinero y grano que moler
+      if (bv.model && b.type.kind === "mill" && b.workers.length && v.res.food > 10 && !v.underAttack) {
+        bv.model.traverse((o) => { if (o.userData.spin) o.rotation.z -= dt * 1.2; });
+      }
     }
 
     // Campos según la estación: brotes en primavera, altos en verano, dorados en otoño, tierra en invierno

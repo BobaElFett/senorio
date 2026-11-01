@@ -39,7 +39,7 @@
   #topright .panel { position: static; }
   #fps, #status { padding: 3px 10px; font-variant-numeric: tabular-nums; }
   #enemies { display: grid; gap: 6px; width: 210px; }
-  #v-enemies { position: fixed; left: 50%; top: 130px; transform: translateX(-50%); display: flex; gap: 8px; }
+  #v-enemies { position: fixed; left: calc(50% + 70px); top: 136px; transform: translateX(-50%); display: flex; gap: 8px; }
   #v-enemies .card { width: 170px; }
 
   #banner { left: 50%; top: 14px; transform: translateX(-50%); padding: 10px 16px; display: flex; gap: 14px; align-items: center; font-size: 14px; border: 1px solid var(--line); }
@@ -77,9 +77,10 @@
   #modebar button.active { background: rgba(255,255,255,.14); color: var(--ink); font-weight: 600; }
   #modebar button:hover { color: var(--ink); }
 
-  #v-top { left: 50%; top: 12px; transform: translateX(-50%); padding: 8px 14px 6px; display: grid; gap: 4px; justify-items: center; }
-  #v-top .row { display: flex; gap: 18px; align-items: baseline; }
-  #v-res { display: flex; gap: 18px; }
+  #v-top { left: calc(50% + 70px); top: 12px; transform: translateX(-50%); padding: 8px 14px 6px; display: grid; gap: 4px; justify-items: center; }
+  #v-top .row { display: flex; gap: 14px; align-items: baseline; }
+  #v-top .row2 { gap: 18px; padding-top: 2px; border-top: 1px solid var(--line); }
+  #v-res { display: flex; gap: 12px; }
   .res { display: flex; gap: 5px; align-items: baseline; white-space: nowrap; }
   .res-label { color: var(--dim); font-size: 12px; }
   .res-val { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
@@ -87,6 +88,9 @@
   .res-rate { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
   .res-rate.pos { color: var(--good); } .res-rate.neg { color: var(--bad); }
   .res.warn .res-val { color: var(--bad); }
+  .res.full .res-val { color: var(--warn); }
+  .res-cap-box { padding-left: 10px; border-left: 1px solid var(--line); }
+  .res-cap-box .res-cap { font-size: 13px; color: var(--ink); }
   #v-appr { position: relative; cursor: default; }
   #v-appr[data-level="good"] .res-val { color: var(--good); }
   #v-appr[data-level="mid"] .res-val { color: var(--warn); }
@@ -96,15 +100,15 @@
   .f-row { display: flex; justify-content: space-between; font-size: 12px; }
   .f-row .pos { color: var(--good); } .f-row .neg { color: var(--bad); }
   .f-note { color: var(--dim); font-size: 11px; margin-top: 4px; }
-  #v-date { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  #v-date { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   #v-build { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; }
-  .build-btn { font: inherit; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 6px 12px; cursor: pointer; display: grid; text-align: left; min-width: 96px; }
+  .build-btn { font: inherit; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; cursor: pointer; display: grid; text-align: left; min-width: 80px; }
   .build-btn:hover { border-color: rgba(255,255,255,.4); }
   .build-btn.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
   .build-btn.cant .build-cost { color: var(--bad); }
   .build-name { font-weight: 600; font-size: 13px; }
-  .build-cost { font-size: 11px; color: var(--dim); }
+  .build-cost { font-size: 11px; color: var(--dim); white-space: nowrap; }
 
   #v-panel { right: 12px; top: 56px; width: 260px; padding: 12px 14px; display: grid; gap: 6px; }
   #v-panel h3 { margin: 0; font-size: 15px; }
@@ -121,12 +125,12 @@
   .p-del { font: inherit; font-size: 12px; margin-top: 4px; background: transparent; color: var(--bad); border: 1px solid rgba(224,103,90,.5); border-radius: 4px; padding: 5px; cursor: pointer; }
   .p-del:disabled { opacity: .4; cursor: default; }
 
-  #v-toasts { position: fixed; left: 12px; bottom: 12px; display: flex; flex-direction: column-reverse; gap: 6px; max-width: 320px; }
-  .toast { background: var(--panel); border-left: 3px solid var(--dim); border-radius: 4px; padding: 6px 10px; font-size: 13px; transition: opacity .8s; }
-  .toast.good { border-left-color: var(--good); } .toast.bad { border-left-color: var(--bad); }
+  #v-toasts { position: fixed; right: 12px; bottom: 96px; display: flex; flex-direction: column-reverse; gap: 6px; max-width: 320px; }
+  .toast { background: var(--panel); border-right: 3px solid var(--dim); border-radius: 4px; padding: 6px 10px; font-size: 13px; transition: opacity .8s; }
+  .toast.good { border-right-color: var(--good); } .toast.bad { border-right-color: var(--bad); }
   .toast.fade { opacity: 0; }
   .place-tip { position: fixed; background: rgba(160, 40, 30, .9); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 4px; pointer-events: none; z-index: 7; }
-  #v-banner { left: 50%; top: 86px; transform: translateX(-50%); padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); max-width: 640px; text-align: center; }
+  #v-banner { left: calc(50% + 70px); top: 92px; transform: translateX(-50%); padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); max-width: 640px; text-align: center; }
   #v-banner[data-kind="warn"] { border-color: var(--warn); color: #f6dca0; }
   #v-banner[data-kind="raid"], #v-banner[data-kind="bad"] { border-color: var(--bad); color: #f7c2bb; }
   #v-banner[data-kind="good"] { border-color: var(--good); color: #c9ecd1; }
@@ -268,12 +272,12 @@
 </div>
 
 <div id="v-top" class="panel village-only">
-  <div class="row">
-    <div id="v-res"></div>
+  <div class="row"><div id="v-res"></div></div>
+  <div class="row row2">
     <div id="v-pop" class="res"></div>
     <div id="v-appr" class="res"><span class="res-label">Aprobación</span><span class="res-val">–</span><span class="res-rate"></span><div id="v-appr-list"></div></div>
+    <div id="v-date"></div>
   </div>
-  <div id="v-date"></div>
 </div>
 <div id="v-build" class="panel village-only"></div>
 <div id="v-panel" class="panel village-only" hidden></div>

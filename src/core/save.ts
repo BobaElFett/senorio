@@ -68,7 +68,7 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   for (const i of d.felled) { const t = forest.trees[i]; if (t) forest.fell(t); }
 
   v.day = d.village.day;
-  v.res = { ...d.village.res };
+  v.res = Object.assign({ wood: 0, food: 0, coins: 0, flour: 0, bread: 0 }, d.village.res);
   v.approval = v.approvalTarget = d.village.approval;
   v.mods = d.village.mods.map((m) => ({ ...m }));
   const byId = new Map<number, Building>();

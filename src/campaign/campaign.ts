@@ -172,9 +172,10 @@ export class Campaign {
         v.underAttack = true;
         this.plunderTime += dd;
         // Se llevan un 30% de lo almacenado por día de saqueo
-        for (const k of ["wood", "food", "coins"] as const) {
+        for (const k of ["wood", "food", "coins", "flour", "bread"] as const) {
           const take = v.res[k] * 0.3 * dd / PLUNDER_DAYS;
-          v.res[k] -= take; this.loot[k] += take;
+          v.res[k] -= take;
+          this.loot[k === "bread" || k === "flour" ? "food" : k] += take;
         }
         if (this.plunderTime >= PLUNDER_DAYS) this.endRaid(false);
       } else {

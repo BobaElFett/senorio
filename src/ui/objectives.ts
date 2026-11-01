@@ -30,7 +30,7 @@ const LIST: Objective[] = [
     done: (_v, c) => c.results.length > 0 && c.results[0] === "victoria" || c.raidIndex >= 1 },
   { id: "winter", title: "Llega al invierno con 60 de comida",
     hint: "Las granjas rinden más en otoño. Licencia los regimientos tras la batalla para que vuelvan a trabajar.",
-    done: (v) => v.season === 3 && v.res.food >= 60 || v.year >= 2 },
+    done: (v) => v.season === 3 && v.foodTotal >= 60 || v.year >= 2 },
 ];
 
 export class Objectives {

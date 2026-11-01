@@ -2,7 +2,8 @@ import { Terrain, MAP_SIZE } from "../world/terrain";
 import { NavGrid, P } from "../world/navgrid";
 import { Forest, Tree } from "../world/forest";
 import {
-  BUILDINGS, BuildingKind, BuildingType, Resource, RESOURCE_LABEL,
+  BUILDINGS, BuildingKind, BuildingType, Resource, RESOURCE_LABEL, RESOURCES,
+  MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR,
   DAY_SECONDS, DAYS_PER_SEASON, SEASONS, BASE_STORAGE, FOOD_PER_FAMILY, FIREWOOD_PER_HOUSE,
   WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY,
 } from "../data/buildings";
@@ -72,8 +73,11 @@ export const fwdOf = (rot: number): P => ({ x: Math.round(Math.sin(rot * Math.PI
  */
 export class Village {
   day = 0.27;                          // días desde el inicio (fracción = hora del día)
-  res: Record<Resource, number> = { wood: 0, food: 0, coins: 0 };
-  rates: Record<Resource, number> = { wood: 0, food: 0, coins: 0 };
+  res: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0 };
+  rates: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0 };
+  breadShare = 0;                      // parte de lo que se come que es pan (0–1)
+  /** Comida total: grano y pan. */
+  get foodTotal() { return this.res.food + this.res.bread; }
   buildings: Building[] = [];
   families: Family[] = [];
   approval = 60;
@@ -125,7 +129,7 @@ export class Village {
   // ------------------------------------------------------------ montaje
   setup() {
     this.version++;
-    this.res = { wood: 30, food: 40, coins: 35 };
+    this.res = { wood: 30, food: 40, coins: 35, flour: 0, bread: 0 };
     const place = (kind: BuildingKind, x: number, z: number, rot: number) => {
       const b = this.addBuilding(kind, x, z, rot, true);
       return b;
@@ -340,6 +344,12 @@ export class Village {
         }
       } else if (b.type.kind === "farm") {
         this.res.food += n * FARM_YIELD[season] * dd;
+      } else if (b.type.kind === "mill") {
+        const amt = Math.max(0, Math.min(n * MILL_PER_WORKER * dd, this.res.food - MILL_RESERVE));
+        this.res.food -= amt; this.res.flour += amt;
+      } else if (b.type.kind === "bakery") {
+        const amt = Math.min(n * BAKE_PER_WORKER * dd, this.res.flour);
+        this.res.flour -= amt; this.res.bread += amt * BREAD_PER_FLOUR;
       } else if (b.type.kind === "market") {
         const housed = this.families.filter((f) => f.home).length;
         this.res.coins += housed * TAX_PER_FAMILY * dd;
@@ -347,9 +357,14 @@ export class Village {
     }
 
     // Consumo
-    this.res.food -= this.families.length * FOOD_PER_FAMILY * dd;
-    this.hungry = this.res.food <= 0;
-    if (this.hungry) this.res.food = 0;
+    // Se come primero el pan y luego el grano
+    const need = this.families.length * FOOD_PER_FAMILY * dd;
+    const fromBread = Math.min(this.res.bread, need);
+    this.res.bread -= fromBread;
+    this.res.food -= need - fromBread;
+    if (need > 0) this.breadShare += (fromBread / need - this.breadShare) * Math.min(1, dd * 2);
+    this.hungry = this.res.food <= 0 && this.res.bread <= 0;
+    if (this.res.food < 0) this.res.food = 0;
     if (season === 3) {
       const occupied = this.houses.filter((h) => h.residents.length).length;
       this.res.wood -= occupied * FIREWOOD_PER_HOUSE * dd;
@@ -360,12 +375,12 @@ export class Village {
     // Capacidad del almacén
     const cap = this.capacity();
     let full = false;
-    for (const r of ["wood", "food", "coins"] as Resource[]) {
+    for (const r of RESOURCES) {
       if (this.res[r] > cap) { this.res[r] = cap; full = true; }
     }
     if (full && this.day - this.fullWarned > 3) { this.fullWarned = this.day; this.event("Almacén lleno: lo que sobra se pierde", "bad"); }
     if (dd > 0) {
-      for (const r of ["wood", "food", "coins"] as Resource[]) {
+      for (const r of RESOURCES) {
         const net = (this.res[r] - before[r]) / dd;
         this.rates[r] += (net - this.rates[r]) * Math.min(1, dt * 0.5);
       }
@@ -384,6 +399,7 @@ export class Village {
     if (this.cold) f.push({ label: "Frío: no hay leña", value: -20 });
     const market = this.buildings.some((b) => b.type.kind === "market" && b.built && b.workers.length);
     if (market) f.push({ label: "Mercado abierto", value: 10 });
+    if (this.breadShare > 0.5) f.push({ label: "Comen pan", value: 8 });
     this.mods = this.mods.filter((m) => m.until > this.day);
     for (const m of this.mods) f.push({ label: m.label, value: m.value });
     this.factors = f;

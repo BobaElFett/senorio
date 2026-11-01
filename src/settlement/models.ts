@@ -151,7 +151,63 @@ function barracks(): THREE.Group {
   return g;
 }
 
-const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks };
+function mill(): THREE.Group {
+  const g = new THREE.Group();
+  // Torre troncocónica de piedra con caperuza y aspas que giran (userData.spin)
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.9, 7.5, 8), mat(C.stone));
+  tower.position.y = 3.75;
+  g.add(tower);
+  const capRoof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 2.4, 8), mat(C.roof));
+  capRoof.position.y = 8.7;
+  g.add(capRoof);
+  g.add(box(1.1, 2, 0.12, C.door, 0, 0, 2.62));
+  g.add(box(0.6, 0.7, 0.1, C.darkWood, 0, 4.4, 2.35));
+  const hub = new THREE.Group();
+  hub.position.set(0, 7.2, 2.6);
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 6), mat(C.darkWood));
+  axle.rotation.x = Math.PI / 2;
+  hub.add(axle);
+  for (let i = 0; i < 4; i++) {
+    const arm = new THREE.Group();
+    arm.rotation.z = (i * Math.PI) / 2;
+    const spar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 5.2, 0.12), mat(C.timber));
+    spar.position.y = 2.6;
+    const sail = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.8, 0.05), mat(C.plaster));
+    sail.position.set(0.62, 3.1, 0.05);
+    arm.add(spar, sail);
+    hub.add(arm);
+  }
+  hub.userData.spin = true;
+  g.add(hub);
+  // Sacos de harina
+  for (const [x, z] of [[-2.6, 2.4], [-2.1, 3.1], [2.7, 2.6]]) g.add(box(0.7, 0.6, 0.5, C.plaster, x, 0, z));
+  return g;
+}
+
+function bakery(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(5.6, 2.8, 4.6, C.plaster, -0.6, 0, -0.4));
+  for (const [x, z] of [[-3.4, -2.7], [2.2, -2.7], [-3.4, 1.9], [2.2, 1.9]]) g.add(box(0.25, 2.8, 0.25, C.timber, x, 0, z));
+  g.add(gable(6.2, 5.6, 2.1, C.roof, 2.8, -0.4));
+  g.add(box(1, 1.7, 0.12, C.door, -1.4, 0, 1.92));
+  // Horno de cúpula a un lado, con su chimenea
+  const oven = new THREE.Mesh(new THREE.SphereGeometry(1.4, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), mat(C.stone));
+  oven.position.set(3.2, 0, 0.6);
+  g.add(oven);
+  g.add(box(0.5, 0.5, 0.2, "#2a1a10", 3.2, 0.1, 1.95));
+  g.add(box(0.5, 1.8, 0.5, C.stone, 3.2, 1.1, 0.2));
+  // Mesa con hogazas
+  g.add(box(1.6, 0.8, 0.7, C.wood, 0.9, 0, 2.6));
+  for (const x of [0.4, 0.9, 1.4]) {
+    const loaf = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), mat(C.hay));
+    loaf.scale.set(1.3, 0.7, 1);
+    loaf.position.set(x, 0.92, 2.6);
+    g.add(loaf);
+  }
+  return g;
+}
+
+const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery };
 
 export function buildingModel(kind: BuildingKind): THREE.Group {
   const g = BUILDERS[kind]();

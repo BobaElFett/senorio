@@ -1,6 +1,6 @@
 import { Village, Building, LevyKind, LEVY } from "../settlement/village";
 import { VillageControls } from "../settlement/villageControls";
-import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY } from "../data/buildings";
+import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR } from "../data/buildings";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
   const e = document.createElement(tag);
@@ -69,15 +69,26 @@ export class VillageHud {
     const cap = v.capacity();
 
     this.res.replaceChildren();
-    for (const r of ["wood", "food", "coins"] as Resource[]) {
+    // Harina y pan solo aparecen cuando hay molino o panadería (o existencias)
+    const chain = v.buildings.some((b) => b.type.kind === "mill" || b.type.kind === "bakery") || v.res.flour + v.res.bread > 0.5;
+    const shown: Resource[] = chain ? ["wood", "food", "flour", "bread", "coins"] : ["wood", "food", "coins"];
+    for (const r of shown) {
       const box = el("div", `res res-${r}`);
       const rate = v.rates[r];
-      const warn = (r === "food" && (v.hungry || (rate < 0 && v.res.food / -rate < 4))) || (r === "wood" && v.cold);
+      const eatRate = v.rates.food + v.rates.bread;
+      const warn = (r === "food" && (v.hungry || (eatRate < 0 && v.foodTotal / -eatRate < 4))) || (r === "wood" && v.cold);
       if (warn) box.classList.add("warn");
+      // La capacidad va en el recuadro «Almacén»; aquí solo se marca si está casi lleno
+      if (v.res[r] >= cap * 0.95) box.classList.add("full");
+      box.title = `${RESOURCE_LABEL[r]}: ${Math.floor(v.res[r])} de ${cap}`;
       box.append(el("span", "res-label", RESOURCE_LABEL[r]), el("span", "res-val", `${Math.floor(v.res[r])}`),
-        el("span", "res-cap", `/${cap}`), el("span", `res-rate ${rate < -0.05 ? "neg" : rate > 0.05 ? "pos" : ""}`, `${fmtRate(rate)}/día`));
+        el("span", `res-rate ${rate < -0.05 ? "neg" : rate > 0.05 ? "pos" : ""}`, `${fmtRate(rate)}`));
       this.res.append(box);
     }
+    const store = el("div", "res res-cap-box");
+    store.title = "Capacidad de cada recurso. Cada almacén suma 150.";
+    store.append(el("span", "res-label", "Almacén"), el("span", "res-cap", `${cap}`));
+    this.res.append(store);
     const homeless = v.homeless.length, idle = v.idle.length;
     this.pop.replaceChildren(
       el("span", "res-label", "Familias"), el("span", "res-val", `${v.families.length}`),
@@ -156,6 +167,13 @@ export class VillageHud {
       } else if (t.kind === "market") {
         const housed = v.families.filter((f) => f.home).length;
         items.push(el("div", "p-row", n ? `Impuestos: ${(housed * TAX_PER_FAMILY).toFixed(1)} monedas/día · +10 aprobación` : "Cerrado: necesita un tendero"));
+      } else if (t.kind === "mill") {
+        const can = Math.max(0, v.res.food - MILL_RESERVE);
+        items.push(el("div", "p-row", n ? `Muele ${(n * MILL_PER_WORKER).toFixed(0)} de grano al día en harina` : "Parado: necesita un molinero"),
+          el("p", can < 1 && n ? "p-note neg" : "p-note", can < 1 && n ? `Sin grano que moler: deja ${MILL_RESERVE} siempre en reserva.` : `Harina en el almacén: ${Math.floor(v.res.flour)}`));
+      } else if (t.kind === "bakery") {
+        items.push(el("div", "p-row", n ? `Cuece ${(n * BAKE_PER_WORKER).toFixed(0)} de harina al día → ${(n * BAKE_PER_WORKER * BREAD_PER_FLOUR).toFixed(0)} de pan` : "Parada: necesita un panadero"),
+          el("p", v.res.flour < 1 && n ? "p-note neg" : "p-note", v.res.flour < 1 && n ? "Sin harina: construye un molino y ponle molinero." : `Pan en el almacén: ${Math.floor(v.res.bread)} · ${Math.round(v.breadShare * 100)}% de lo que se come es pan${v.breadShare > 0.5 ? " (+8 aprobación)" : ""}`));
       } else if (t.kind === "storehouse") {
         items.push(el("div", "p-row", `+${t.storage} de capacidad para cada recurso`));
       } else if (t.kind === "house") {
