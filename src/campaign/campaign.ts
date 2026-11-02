@@ -68,6 +68,8 @@ export class Campaign {
   /** El señor rival: tras las tres bandas de bandidos, las incursiones son huestes suyas. */
   rival: Rival | null = null;              // tras las tres incursiones, seguir con ataques cada vez mayores
   private lastFamilies = 0;
+  /** Día desde el que la leva espera sin enemigos (para recordar que se licencie). */
+  private idleArmySince: number | null = null;
 
   constructor(public village: Village, public battle: Battle) {
     battle.campaign = true;
@@ -235,6 +237,11 @@ export class Campaign {
     }
     const up = v.upgrades;
     b.bonus[0] = { attack: up.arms, arrow: up.arms * 0.75, defense: up.armor, hp: up.armor * 1.5 };
+    if (this.phase === "calm" && this.idleArmySince !== null && v.day - this.idleArmySince > 3) {
+      const men = b.regiments.filter((x) => x.team === 0 && x.active).reduce((n, x) => n + x.count, 0);
+      if (men > 0) v.event(`${men} hombres siguen en la leva sin trabajar. Si no esperas enemigos, licencia los regimientos`, "info");
+      this.idleArmySince = null;
+    }
     v.horses = b.regiments.reduce((n, x) => n + (x.team === 0 && x.type.mounted ? x.count : 0), 0);
 
     const r = this.raid;
@@ -337,7 +344,10 @@ export class Campaign {
       const bounty = 15 * (this.raidIndex + 1);
       v.res.coins += bounty;
       v.addMod("Victoria sobre los bandidos", 15, 6);
-      v.event(`¡Victoria! Los bandidos huyen. Botín: ${bounty} monedas`, "good");
+      const r = this.raid;
+      const army = this.battle.regiments.some((x) => x.team === 0 && x.active);
+      v.event(`¡Victoria! ${r?.lord ? "Los de Montfort" : "Los bandidos"} huyen. Botín: ${bounty} monedas${army ? ". Licencia tus regimientos (botón en su tarjeta) para que vuelvan a trabajar" : ""}`, "good");
+      this.idleArmySince = v.day;
       for (const x of this.raiders) if (this.battle.regiments.includes(x)) this.battle.removeRegiment(x);
       this.nextRaid();
     } else {
