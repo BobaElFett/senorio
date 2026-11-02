@@ -141,9 +141,11 @@ export class Battle {
     this.add(0, "Lanceros de la aldea", "spear", -62, -26, W);
     this.add(0, "Lanceros del molino", "spear", -62, 26, W);
     this.add(0, "Arqueros de la aldea", "archer", -48, 0, W);
+    this.spawn(0, "Jinetes de la aldea", "cavalry", -56, 58, W, 14);
     this.add(1, "Lanceros bandidos", "spear", -150, 0, E);
     this.add(1, "Saqueadores", "militia", -150, 45, E);
     this.add(1, "Arqueros bandidos", "archer", -165, -30, E);
+    this.spawn(1, "Jinetes bandidos", "cavalry", -168, -62, E, 10);
   }
 
   private add(team: Team, name: string, kind: UnitKind, x: number, z: number, facing: number) {
@@ -308,7 +310,11 @@ export class Battle {
           r.destFacing = Math.atan2(t.cx - r.cx, t.cz - r.cz);
         }
       } else {
-        r.running = d < 35 && !r.engaged;
+        // Los jinetes toman carrerilla desde más lejos y, si se apartan, pueden volver a cargar
+        const runup = r.type.mounted ? 60 : 35;
+        if (r.type.mounted && !r.engaged && d > 30) r.charged = false;
+        // (los jinetes siguen al galope hasta el primer golpe: si no, la carga se queda en nada)
+        r.running = d < runup && (!r.engaged || (!!r.type.mounted && !r.charged));
         r.repath -= dt;
         if (r.engaged) {
           r.path = [];
@@ -410,11 +416,12 @@ export class Battle {
         const t = s.target;
         const d = Math.hypot(t.x - s.x, t.z - s.z);
         r.fighting++;
-        if (d < 1.6) {
+        const reach = r.type.reach;
+        if (d < reach) {
           gx = s.x; gz = s.z;
           if (s.cooldown <= 0) this.strike(s, t);
         } else {
-          gx = t.x - ((t.x - s.x) / d) * 1.1; gz = t.z - ((t.z - s.z) / d) * 1.1;
+          gx = t.x - ((t.x - s.x) / d) * reach * 0.7; gz = t.z - ((t.z - s.z) / d) * reach * 0.7;
         }
         maxSpeed = r.running ? r.type.runSpeed : r.type.speed * 1.2;
       } else if (r.breach && !r.path.length) {
@@ -452,9 +459,12 @@ export class Battle {
       const sp = Math.min(maxSpeed, dist * 2.5);
       wx = (dx / dist) * sp; wz = (dz / dist) * sp;
     }
-    this.near(s.x, s.z, 0.85, (o, d) => {
+    const rad = r.type.radius;
+    this.near(s.x, s.z, rad + 0.85, (o, d) => {
       if (o === s || d < 1e-4) return;
-      const push = (0.85 - d) * 4;
+      const gap = rad + o.reg.type.radius;
+      if (d >= gap) return;
+      const push = (gap - d) * 4;
       wx += ((s.x - o.x) / d) * push; wz += ((s.z - o.z) / d) * push;
     });
     const a = Math.min(1, dt * 8);
@@ -497,10 +507,14 @@ export class Battle {
     // Impacto de la carga: una vez por ataque
     if (ar.running && !ar.charged && ar.type.charge > 0) {
       ar.charged = true;
-      ar.running = false;
+      if (!ar.type.mounted) ar.running = false;
       ar.chargeUntil = this.time + 4;
       const braced = dr.type.kind === "spear" && cos > 0.4 && dr.state === "ok" && !dr.path.length;
-      if (braced) ar.morale -= 8; else dr.morale -= 10 * ar.type.charge;
+      if (braced) {
+        // Cargar de frente contra un muro de lanzas: los caballos se clavan
+        ar.morale -= ar.type.mounted ? 20 : 8;
+        if (ar.type.mounted) for (const x of ar.alive.slice(0, Math.ceil(ar.alive.length / 3))) this.damage(x, 3 + Math.random() * 3);
+      } else dr.morale -= 10 * ar.type.charge;
       this.onEvent?.("charge", d.x, d.z);
     }
     let hit = 0.5 + (ar.type.attack - dr.type.defense) * 0.06;
@@ -508,10 +522,17 @@ export class Battle {
     if (rear) hit += 0.25;
     if (ar.state === "wavering") hit -= 0.1;
     if (dr.state === "routing") hit += 0.3;
+    const antiHorse = ar.type.kind === "spear" && dr.type.mounted;
+    if (antiHorse) hit += 0.1;
+    // Jinetes en plena carga: arrollan a quien pillan y golpean más deprisa
+    const impact = ar.type.mounted && this.time < ar.chargeUntil;
+    if (impact) { hit += 0.35; a.cooldown *= 0.5; }
     this.onEvent?.("strike", d.x, d.z);
     if (Math.random() < clamp(hit, 0.08, 0.95)) {
       let dmg = 2 + Math.random() * 1.5;
-      if (this.time < ar.chargeUntil) dmg *= 1.5;
+      if (this.time < ar.chargeUntil) dmg *= ar.type.mounted ? 2.2 : 1.5;
+      if (antiHorse) dmg *= 1.15;
+      else if (dr.type.mounted) dmg *= 0.75;   // a pie cuesta alcanzar al jinete
       this.damage(d, dmg);
     }
   }
@@ -645,7 +666,9 @@ export class Battle {
       for (const o of this.regiments) {
         if (o.team !== 0 || !o.active) continue;
         // Los cuerpo a cuerpo prefieren a los arqueros si están cerca
-        const d = Math.hypot(o.cx - r.cx, o.cz - r.cz) - (r.type.range === 0 && o.type.range > 0 ? 15 : 0);
+        let d = Math.hypot(o.cx - r.cx, o.cz - r.cz) - (r.type.range === 0 && o.type.range > 0 ? 15 : 0);
+        // Los jinetes buscan arqueros y evitan las lanzas
+        if (r.type.mounted) d += (o.type.range > 0 ? -30 : 0) + (o.type.kind === "spear" ? 25 : 0);
         if (d < bd) { bd = d; best = o; }
       }
       // Saqueo: si nadie les sale al paso, van a por la aldea

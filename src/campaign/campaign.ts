@@ -1,4 +1,4 @@
-import { Village, LevyKind, LEVY } from "../settlement/village";
+import { Village, LevyKind, LEVY, isLevyKind } from "../settlement/village";
 import { Battle, Regiment } from "../combat/battle";
 import { UnitKind } from "../data/units";
 import { P } from "../world/navgrid";
@@ -20,7 +20,7 @@ const RAIDS: RaidSpec[] = [
   { day: 38, name: "Los saqueadores del bosque", from: { x: -175, z: -40 },
     units: [["militia", 26, "Saqueadores"], ["archer", 14, "Arqueros bandidos"]] },
   { day: 58, name: "La hueste del barón bandido", from: { x: -175, z: 30 },
-    units: [["spear", 30, "Lanceros del barón"], ["militia", 26, "Mesnada"], ["archer", 18, "Ballesteros"]] },
+    units: [["spear", 30, "Lanceros del barón"], ["militia", 26, "Mesnada"], ["archer", 18, "Ballesteros"], ["cavalry", 10, "Jinetes del barón"]] },
 ];
 export type Difficulty = "facil" | "normal" | "dificil";
 export const DIFFICULTY: Record<Difficulty, { label: string; size: number; delay: number; note: string }> = {
@@ -31,7 +31,6 @@ export const DIFFICULTY: Record<Difficulty, { label: string; size: number; delay
 
 const WARNING_DAYS = 2;
 const PLUNDER_DAYS = 1;
-const MEN_PER_FAMILY = 4;
 
 export type Phase = "calm" | "warning" | "raid" | "plunder" | "withdraw" | "won" | "lost";
 
@@ -43,7 +42,7 @@ export class Campaign {
   withdrawTime = 0;
   loot = { wood: 0, food: 0, coins: 0 };
   results: ("victoria" | "saqueo")[] = [];
-  private levyCount: Record<LevyKind, number> = { spear: 0, archer: 0 };
+  private levyCount: Record<LevyKind, number> = { spear: 0, archer: 0, cavalry: 0 };
   difficulty: Difficulty = "normal";
   endless = false;              // tras las tres incursiones, seguir con ataques cada vez mayores
   private lastFamilies = 0;
@@ -64,7 +63,7 @@ export class Campaign {
       const froms = [{ x: -175, z: 0 }, { x: -170, z: -60 }, { x: -170, z: 60 }];
       base = {
         day: RAIDS[RAIDS.length - 1].day + 20 * k, name: `La ${i + 1}.ª incursión`, from: froms[k % froms.length],
-        units: [["spear", 30 + 6 * k, "Lanceros"], ["militia", 26 + 5 * k, "Mesnada"], ["archer", 18 + 4 * k, "Ballesteros"]],
+        units: [["spear", 30 + 6 * k, "Lanceros"], ["militia", 26 + 5 * k, "Mesnada"], ["archer", 18 + 4 * k, "Ballesteros"], ["cavalry", 10 + 2 * k, "Jinetes"]],
       };
     }
     return {
@@ -145,15 +144,17 @@ export class Campaign {
     const v = this.village;
     const plan = v.levyPlan(kind);
     if (!plan.ok) return null;
-    const barracks = v.buildings.find((b) => b.built && b.type.kind === "barracks")!;
+    const spec = LEVY[kind];
+    const barracks = v.buildings.find((b) => b.built && b.type.kind === spec.at)!;
     const fams = plan.families;
-    const men = fams.reduce((s, f) => s + Math.min(MEN_PER_FAMILY, f.members), 0);
+    const per = spec.men;
+    const men = fams.reduce((s, f) => s + Math.min(per, f.members), 0);
     const n = ++this.levyCount[kind];
     const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][(n - 1) % 10];
     const facing = Math.atan2(barracks.door.x - barracks.x, barracks.door.z - barracks.z);
     // Soldado i → familia: se reparten en el orden de las familias
     const owners: number[] = [];
-    for (const f of fams) for (let k = 0; k < Math.min(MEN_PER_FAMILY, f.members); k++) owners.push(f.id);
+    for (const f of fams) for (let k = 0; k < Math.min(per, f.members); k++) owners.push(f.id);
     const ahead = { x: barracks.door.x + Math.sin(facing) * 6, z: barracks.door.z + Math.cos(facing) * 6 };
     const reg = this.battle.spawn(0, `${LEVY[kind].label} ${roman}`, kind, ahead.x, ahead.z, facing, men, (i) => owners[i] ?? 0);
     v.applyLevy(kind, fams, reg.id);
@@ -163,7 +164,7 @@ export class Campaign {
   /** Licenciar: los supervivientes vuelven a casa y a trabajar. */
   disband(r: Regiment) {
     if (r.team !== 0 || r.engaged) return;
-    this.village.returnFromLevy(r.id, { x: r.cx, z: r.cz }, r.type.kind === "archer" ? "archer" : "spear");
+    this.village.returnFromLevy(r.id, { x: r.cx, z: r.cz }, isLevyKind(r.type.kind) ? r.type.kind : "spear");
     this.battle.removeRegiment(r);
     this.village.event(`${r.name} se licencia: ${r.count} hombres vuelven a casa`, "info");
   }
@@ -182,6 +183,7 @@ export class Campaign {
       if (r.team === 0) v.returnFromLevy(r.id, { x: r.cx, z: r.cz });
       b.removeRegiment(r);
     }
+    v.horses = b.regiments.reduce((n, x) => n + (x.team === 0 && x.type.mounted ? x.count : 0), 0);
 
     const r = this.raid;
     const lead = WARNING_DAYS + (this.watchTowers.length ? 1 : 0);

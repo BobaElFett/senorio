@@ -230,7 +230,33 @@ function tower(): THREE.Group {
   return g;
 }
 
-const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower };
+function horse(coat: string, x: number, z: number, r: number): THREE.Group {
+  const h = new THREE.Group();
+  h.add(box(0.55, 0.55, 1.5, coat, 0, 0.85, 0));
+  const neck = box(0.28, 0.75, 0.32, coat, 0, 0, 0); neck.position.set(0, 1.65, 0.7); neck.rotation.x = 0.5; h.add(neck);
+  const head = box(0.24, 0.26, 0.55, coat, 0, 0, 0); head.position.set(0, 1.95, 1.0); head.rotation.x = 0.4; h.add(head);
+  for (const [lx, lz] of [[-0.18, 0.55], [0.18, 0.55], [-0.18, -0.55], [0.18, -0.55]]) h.add(box(0.13, 0.85, 0.15, coat, lx, 0, lz));
+  h.position.set(x, 0, z); h.rotation.y = r;
+  return h;
+}
+
+function stable(): THREE.Group {
+  const g = new THREE.Group();
+  // Cuadra alargada con tejado a un agua y cuatro boxes abiertos al frente
+  g.add(box(10, 2.6, 3.6, C.wood, 0, 0, -2));
+  const roof = box(10.8, 0.25, 4.6, C.thatch, 0, 2.7, -1.8); roof.rotation.x = 0.22; g.add(roof);
+  for (let i = 0; i < 5; i++) g.add(box(0.25, 2.6, 0.25, C.timber, -5 + i * 2.5, 0, -0.1));
+  g.add(horse("#6b4a2e", -3.75, -1.6, Math.PI), horse("#2f2a26", 1.25, -1.6, Math.PI));
+  // Cercado con caballo suelto y heno
+  for (let i = 0; i < 6; i++) g.add(box(0.15, 1.1, 0.15, C.darkWood, -5.5 + i * 2.2, 0, 3.7));
+  g.add(box(11.2, 0.12, 0.08, C.timber, 0, 0.9, 3.7), box(11.2, 0.12, 0.08, C.timber, 0, 0.5, 3.7));
+  g.add(horse("#8a6a4a", 3, 2, 1.2));
+  g.add(box(1.1, 0.8, 0.9, C.hay, -3.8, 0, 2.2), box(0.9, 0.6, 0.9, C.hay, -2.6, 0, 2.4));
+  g.add(box(1.4, 0.45, 0.5, C.darkWood, 0.2, 0, 1.6));   // abrevadero
+  return g;
+}
+
+const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower, stable };
 
 export function buildingModel(kind: BuildingKind): THREE.Group {
   const g = BUILDERS[kind]();

@@ -4,7 +4,7 @@ import { Forest, Tree } from "../world/forest";
 import {
   BUILDINGS, BuildingKind, BuildingType, Resource, RESOURCE_LABEL, RESOURCES,
   MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR,
-  DAY_SECONDS, DAYS_PER_SEASON, SEASONS, BASE_STORAGE, FOOD_PER_FAMILY, FIREWOOD_PER_HOUSE,
+  DAY_SECONDS, DAYS_PER_SEASON, SEASONS, BASE_STORAGE, FOOD_PER_FAMILY, FIREWOOD_PER_HOUSE, HORSE_FOOD,
   WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY,
 } from "../data/buildings";
 
@@ -66,11 +66,14 @@ export interface Family {
 
 export interface Modifier { label: string; value: number; until: number }
 
-export type LevyKind = "spear" | "archer";
-export const LEVY: Record<LevyKind, { label: string; maxFamilies: number; wood: number; coins: number }> = {
-  spear: { label: "Lanceros", maxFamilies: 8, wood: 2, coins: 1 },   // coste por familia
-  archer: { label: "Arqueros", maxFamilies: 6, wood: 3, coins: 2 },
+export type LevyKind = "spear" | "archer" | "cavalry";
+/** Coste por familia; `men` hombres de cada familia van a la leva; `at` es el edificio que recluta. */
+export const LEVY: Record<LevyKind, { label: string; maxFamilies: number; wood: number; coins: number; men: number; at: BuildingKind }> = {
+  spear: { label: "Lanceros", maxFamilies: 8, wood: 2, coins: 1, men: 4, at: "barracks" },
+  archer: { label: "Arqueros", maxFamilies: 6, wood: 3, coins: 2, men: 4, at: "barracks" },
+  cavalry: { label: "Jinetes", maxFamilies: 7, wood: 1, coins: 7, men: 2, at: "stable" },
 };
+export const isLevyKind = (k: string): k is LevyKind => k in LEVY;
 export const MIN_LEVY = 3;
 
 export interface VillageEvent { id: number; text: string; kind: "good" | "bad" | "info" }
@@ -104,8 +107,10 @@ export class Village {
   cold = false;
   underAttack = false;               // durante un saqueo no se trabaja
   /** Equipos guardados en el cuartel (por familia) de regimientos licenciados. */
-  equipment: Record<LevyKind, number> = { spear: 0, archer: 0 };
+  equipment: Record<LevyKind, number> = { spear: 0, archer: 0, cavalry: 0 };
   mods: Modifier[] = [];
+  /** Caballos en servicio (los cuenta la campaña): comen grano. */
+  horses = 0;
   version = 0;
   private nextId = 1;
   private nextEvent = 1;
@@ -390,7 +395,7 @@ export class Village {
 
     // Consumo
     // Se come primero el pan y luego el grano
-    const need = this.families.length * FOOD_PER_FAMILY * dd;
+    const need = (this.families.length * FOOD_PER_FAMILY + this.horses * HORSE_FOOD) * dd;
     const fromBread = Math.min(this.res.bread, need);
     this.res.bread -= fromBread;
     this.res.food -= need - fromBread;
@@ -483,7 +488,7 @@ export class Village {
     const buy = families.length - reused;
     const wood = buy * spec.wood, coins = buy * spec.coins;
     let reason = "";
-    if (!this.has("barracks")) reason = "Hace falta un cuartel terminado";
+    if (!this.has(spec.at)) reason = spec.at === "stable" ? "Hace falta un establo terminado" : "Hace falta un cuartel terminado";
     else if (families.length < MIN_LEVY) reason = `Hacen falta al menos ${MIN_LEVY} familias en casa`;
     else if (this.res.wood < wood) reason = `Falta madera (${wood})`;
     else if (this.res.coins < coins) reason = `Faltan monedas (${coins})`;

@@ -7,7 +7,10 @@ import { P } from "../world/navgrid";
 const TEAM_COLORS: Record<string, string> = {
   "0-spear": "#3d63b8", "0-archer": "#5f93d4", "0-militia": "#46559a",
   "1-spear": "#b23a2e", "1-archer": "#d1724c", "1-militia": "#8c3a2a",
+  "0-cavalry": "#2b4c9a", "1-cavalry": "#9a2c24",
 };
+const HORSE_COATS = ["#6b4a2e", "#4a3424", "#8a6a4a", "#2f2a26", "#a89c8c"];
+const RIDER_LIFT = 1.0;
 const FLAG_COLORS = ["#2f58b0", "#a8302a"];
 const CORPSE = new THREE.Color("#4a3d30");
 
@@ -28,6 +31,9 @@ export class BattleView {
   private hip = new THREE.Matrix4();
   private bowIndex = new Map<Soldier, number>();
   private spears!: THREE.InstancedMesh;
+  private horses!: THREE.InstancedMesh;
+  private horseIndex = new Map<Soldier, number>();
+  private lift = new THREE.Matrix4();
   private spearIndex = new Map<Soldier, number>();
   private arrows: THREE.InstancedMesh;
   private markers: THREE.InstancedMesh;
@@ -109,6 +115,8 @@ export class BattleView {
       spear: mergeGeometries([paint(skull, "#d6aa84"), paint(helm, "#8f979e"), paint(nasal, "#8f979e")])!,
       archer: mergeGeometries([paint(skull, "#d6aa84"), paint(hood, "#5d5a36")])!,
       militia: mergeGeometries([paint(skull, "#d6aa84"), paint(cap, "#6e3a28")])!,
+      cavalry: mergeGeometries([paint(skull, "#d6aa84"), paint(helm.clone(), "#b8bec4"), paint(nasal.clone(), "#b8bec4"),
+        paint(new THREE.ConeGeometry(0.07, 0.3, 4).translate(0, 1.72, -0.02), "#c9a23a")])!,
     };
     this.heads.clear(); this.headIndex.clear(); this.bowIndex.clear();
     const headMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7 });
@@ -131,6 +139,28 @@ export class BattleView {
     this.bows.frustumCulled = false;
     if (!archers.length) this.bows.count = 0;
     this.group.add(this.bows);
+
+    // Caballos de los jinetes
+    const coat = (g: THREE.BufferGeometry) => paint(g, "#ffffff");
+    const hb = new THREE.BoxGeometry(0.62, 0.62, 1.7); hb.translate(0, 1.2, 0);
+    const neck = new THREE.BoxGeometry(0.3, 0.8, 0.35); neck.rotateX(0.55); neck.translate(0, 1.62, 0.85);
+    const hd = new THREE.BoxGeometry(0.26, 0.28, 0.6); hd.rotateX(0.35); hd.translate(0, 1.95, 1.15);
+    const tail = new THREE.BoxGeometry(0.1, 0.6, 0.12); tail.rotateX(-0.4); tail.translate(0, 1.15, -0.95);
+    const legParts = [[-0.2, 0.62], [0.2, 0.62], [-0.2, -0.62], [0.2, -0.62]].map(([x, z]) => {
+      const l = new THREE.BoxGeometry(0.15, 0.95, 0.17); l.translate(x, 0.47, z); return coat(l);
+    });
+    const saddle = paint(new THREE.BoxGeometry(0.68, 0.12, 0.6).translate(0, 1.55, -0.05), "#5a3a22");
+    const horseGeo = mergeGeometries([coat(hb), coat(neck), coat(hd), paint(tail, "#2a2018"), ...legParts, saddle])!;
+    horseGeo.computeVertexNormals();
+    const riders = b.soldiers.filter((s) => s.reg.type.mounted);
+    this.horseIndex.clear();
+    riders.forEach((s, i) => this.horseIndex.set(s, i));
+    this.horses = new THREE.InstancedMesh(horseGeo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), Math.max(1, riders.length));
+    this.horses.castShadow = true; this.horses.frustumCulled = false;
+    if (!riders.length) this.horses.count = 0;
+    riders.forEach((s, i) => this.horses.setColorAt(i, this.c.set(HORSE_COATS[s.id % HORSE_COATS.length])));
+    if (this.horses.instanceColor) this.horses.instanceColor.needsUpdate = true;
+    this.group.add(this.horses);
 
     for (const r of b.regiments) {
       this.banners.set(r, this.makeBanner(r));
@@ -163,6 +193,9 @@ export class BattleView {
       ctx.arc(52, 40, 28, -1.2, 1.2); ctx.stroke();
       ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(62, 14); ctx.lineTo(62, 66); ctx.stroke();
       ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(36, 40); ctx.lineTo(96, 40); ctx.stroke();
+    } else if (r.type.kind === "cavalry") {             // herradura
+      ctx.lineWidth = 9; ctx.arc(64, 34, 22, Math.PI * 0.85, Math.PI * 2.15); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(43, 41); ctx.lineTo(41, 66); ctx.moveTo(85, 41); ctx.lineTo(87, 66); ctx.stroke();
     } else {                                             // hachas cruzadas
       ctx.moveTo(40, 14); ctx.lineTo(88, 66); ctx.moveTo(88, 14); ctx.lineTo(40, 66); ctx.stroke();
     }
@@ -212,12 +245,32 @@ export class BattleView {
         const fx = Math.sin(s.heading) * lunge, fz = Math.cos(s.heading) * lunge;
         this.m.compose(this.v.set(s.x + fx, s.y + bob, s.z + fz), this.q, this.sc.set(1, 1, 1));
       }
-      this.bodies.setMatrixAt(i, this.m);
-      // Piernas: balanceo al andar, quietas en formación
       const speed = Math.hypot(s.vx, s.vz);
-      const swing = s.alive && !s.fled ? Math.sin(s.bob * 2) * Math.min(1, speed / 2.5) * 0.65 : 0;
+      const hi0 = this.horseIndex.get(s);
+      if (hi0 !== undefined) {
+        // El caballo va donde el soldado; el jinete, encima
+        if (!s.alive && !s.fled) {
+          // Caballo caído, de costado
+          this.e.set(0, s.heading, Math.PI / 2, "YXZ");
+          this.q.setFromEuler(this.e);
+          this.legM.compose(this.v.set(s.x, s.y + 0.32, s.z), this.q, this.sc.set(1, 1, 1));
+          this.horses.setMatrixAt(hi0, this.legM);
+        } else this.horses.setMatrixAt(hi0, this.m);
+        if (s.alive && !s.fled) {
+          const gallop = Math.sin(s.bob * 1.2) * Math.min(1, speed / 4) * 0.05;
+          this.hip.makeRotationX(gallop);
+          this.legM.multiplyMatrices(this.m, this.hip);
+          this.horses.setMatrixAt(hi0, this.legM);
+        }
+        if (s.alive && !s.fled) this.m.multiply(this.lift.makeTranslation(0, RIDER_LIFT, -0.05));
+      }
+      this.bodies.setMatrixAt(i, this.m);
+      // Piernas: balanceo al andar, quietas en formación; a caballo, a horcajadas
+      const swing = s.alive && !s.fled && hi0 === undefined ? Math.sin(s.bob * 2) * Math.min(1, speed / 2.5) * 0.65 : 0;
       for (let side = 0; side < 2; side++) {
-        this.hip.makeRotationX(side ? swing : -swing).setPosition(side ? 0.11 : -0.11, 0.6, 0);
+        if (hi0 !== undefined) {
+          this.hip.makeRotationZ(side ? 0.5 : -0.5).setPosition(side ? 0.28 : -0.28, 0.62, 0);
+        } else this.hip.makeRotationX(side ? swing : -swing).setPosition(side ? 0.11 : -0.11, 0.6, 0);
         this.legM.multiplyMatrices(this.m, this.hip);
         this.legs[side].setMatrixAt(i, this.legM);
       }
@@ -240,6 +293,7 @@ export class BattleView {
     if (this.bodies.instanceColor) this.bodies.instanceColor.needsUpdate = true;
     this.spears.instanceMatrix.needsUpdate = true;
     this.bows.instanceMatrix.needsUpdate = true;
+    this.horses.instanceMatrix.needsUpdate = true;
     for (const l of this.legs) l.instanceMatrix.needsUpdate = true;
     for (const h of this.heads.values()) h.instanceMatrix.needsUpdate = true;
 

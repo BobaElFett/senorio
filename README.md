@@ -17,6 +17,10 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - Los aldeanos y tus tropas cruzan las puertas; los bandidos no. Si no tienen otro camino, eligen un tramo y lo derriban a hachazos (unos 30 s una banda de 20); la brecha se abre en la navegación y siguen hacia la aldea.
 - Clic en un tramo: resistencia y demoler. Los tramos se guardan con la partida.
 - **Torre de vigía** (8 madera, 5 monedas, 1 vigía): las incursiones se avisan 3 días antes en vez de 2, y dispara flechas a los bandidos a 70 m.
+- **Caballería**: el **establo** (14 madera, 25 monedas) forma jinetes, 2 por familia (7 monedas y 1 madera por familia; los caballos se guardan al licenciar). Cada caballo en servicio come 0,25 de grano al día.
+  - La carga a galope arrolla a arqueros y milicia y rompe a los lanceros por la espalda; de frente contra lanzas firmes, los jinetes pierden.
+  - El barón bandido (tercera incursión) y el modo libre traen jinetes; buscan a tus arqueros y evitan tus lanzas.
+  - La batalla de prueba incluye jinetes en los dos bandos.
 
 ## Novedades 0.6 (noche del 1 al 2 de noviembre)
 - **Dificultad** al empezar: fácil (bandidos −25% y 6 días más tarde), normal o difícil (+30% y 4 días antes).

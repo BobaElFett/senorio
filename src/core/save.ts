@@ -73,7 +73,7 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   v.res = Object.assign({ wood: 0, food: 0, coins: 0, flour: 0, bread: 0 }, d.village.res);
   v.approval = v.approvalTarget = d.village.approval;
   v.mods = d.village.mods.map((m) => ({ ...m }));
-  v.equipment = { spear: 0, archer: 0, ...(d.village.equipment ?? {}) };
+  v.equipment = { spear: 0, archer: 0, cavalry: 0, ...(d.village.equipment ?? {}) };
   const byId = new Map<number, Building>();
   for (const s of d.village.buildings) {
     const bld: Building = vv.addBuilding(s.kind, s.x, s.z, s.rot, s.built);
@@ -120,7 +120,7 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   c.results = [...d.campaign.results];
   c.plunderTime = d.campaign.plunderTime;
   c.withdrawTime = d.campaign.withdrawTime;
-  cc.levyCount = { spear: 0, archer: 0, ...d.campaign.levyCount };
+  cc.levyCount = { spear: 0, archer: 0, cavalry: 0, ...d.campaign.levyCount };
   c.difficulty = d.campaign.difficulty ?? "normal";
   c.endless = !!d.campaign.endless;
   c.endlessShift = d.campaign.endlessShift ?? 0;
