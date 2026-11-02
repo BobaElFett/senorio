@@ -12,6 +12,10 @@ const TEAM_COLORS: Record<string, string> = {
 const HORSE_COATS = ["#6b4a2e", "#4a3424", "#8a6a4a", "#2f2a26", "#a89c8c"];
 const RIDER_LIFT = 1.0;
 const FLAG_COLORS = ["#2f58b0", "#a8302a"];
+// Colores ya convertidos: parsear «#rrggbb» por soldado y fotograma salía caro
+const TEAM_COLOR = new Map(Object.entries(TEAM_COLORS).map(([k, v]) => [k, new THREE.Color(v)]));
+const ROUT_GREY = new THREE.Color("#c9c3b5");
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const CORPSE = new THREE.Color("#4a3d30");
 
 interface Banner { group: THREE.Group; flag: THREE.Mesh; mat: THREE.MeshBasicMaterial; pole: THREE.Mesh }
@@ -274,15 +278,15 @@ export class BattleView {
         this.legM.multiplyMatrices(this.m, this.hip);
         this.legs[side].setMatrixAt(i, this.legM);
       }
-      this.c.set(TEAM_COLORS[`${s.reg.team}-${k}`]);
+      this.c.copy(TEAM_COLOR.get(s.reg.colorKey ??= `${s.reg.team}-${k}`)!);
       if (!s.alive) this.c.lerp(CORPSE, 0.55);
-      else if (s.reg.state === "routing") this.c.lerp(new THREE.Color("#c9c3b5"), 0.45);
+      else if (s.reg.state === "routing") this.c.lerp(ROUT_GREY, 0.45);
       else if (selected.has(s.reg)) this.c.offsetHSL(0, 0.05, 0.12);
       this.bodies.setColorAt(i, this.c);
       const hi = this.headIndex.get(s);
       if (hi) hi[0].setMatrixAt(hi[1], this.m);
       const bi = this.bowIndex.get(s);
-      if (bi !== undefined) this.bows.setMatrixAt(bi, !s.alive || s.fled ? this.m.clone().makeScale(0, 0, 0) : this.m);
+      if (bi !== undefined) this.bows.setMatrixAt(bi, !s.alive || s.fled ? ZERO : this.m);
       const si = this.spearIndex.get(s);
       if (si !== undefined) {
         if (!s.alive || s.fled || s.reg.state === "routing") this.m.makeScale(0, 0, 0);

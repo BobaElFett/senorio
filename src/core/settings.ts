@@ -6,10 +6,11 @@ export interface Settings {
   sfx: number;
   edgePan: boolean;
   help: boolean;
+  lowGraphics: boolean; // sin sombras y a resolución normal (ordenadores modestos)
 }
 
 const KEY = "senorio.settings.v1";
-const DEFAULTS: Settings = { master: 0.8, music: 0.5, sfx: 0.8, edgePan: true, help: true };
+const DEFAULTS: Settings = { master: 0.8, music: 0.5, sfx: 0.8, edgePan: true, help: true, lowGraphics: false };
 
 export function loadSettings(): Settings {
   try {

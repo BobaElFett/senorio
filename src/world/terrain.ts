@@ -4,6 +4,7 @@ import { ValueNoise } from "./noise";
 export const MAP_SIZE = 720;      // metros de lado
 export const WATER_LEVEL = 0;
 const SEGMENTS = 260;
+const GRID_STEP = 1.5;            // m entre alturas precalculadas
 const VILLAGE_RADIUS = 45;        // zona llana central para construir
 const VILLAGE_HEIGHT = 3;
 /** Explanada del castro del señor rival, al este del río. */
@@ -25,6 +26,7 @@ export class Terrain {
   constructor(seed = 7) {
     this.noise = new ValueNoise(seed);
     this.detail = new ValueNoise(seed + 101);
+    this.buildGrid();
     this.mesh = this.buildMesh();
     this.water = this.buildWater();
   }
@@ -46,7 +48,30 @@ export class Terrain {
     return Math.hypot(x - RIVAL_SEAT.x, z - RIVAL_SEAT.z) < RIVAL_SEAT.r + margin;
   }
 
+  // Alturas precalculadas cada GRID_STEP m: heightAt se llama miles de veces por fotograma
+  // (soldados, flechas, aldeanos) y el ruido fractal es caro.
+  private grid!: Float32Array;
+  private gridN = 0;
+  private buildGrid() {
+    const n = Math.round(MAP_SIZE / GRID_STEP) + 1, half = MAP_SIZE / 2;
+    this.grid = new Float32Array(n * n);
+    this.gridN = n;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) this.grid[j * n + i] = this.computeHeight(i * GRID_STEP - half, j * GRID_STEP - half);
+  }
+
+  /** Altura del suelo (interpolada de la rejilla precalculada). */
   heightAt(x: number, z: number): number {
+    const n = this.gridN, half = MAP_SIZE / 2;
+    let fx = (x + half) / GRID_STEP, fz = (z + half) / GRID_STEP;
+    fx = fx < 0 ? 0 : fx > n - 1.001 ? n - 1.001 : fx;
+    fz = fz < 0 ? 0 : fz > n - 1.001 ? n - 1.001 : fz;
+    const i = fx | 0, j = fz | 0, tx = fx - i, tz = fz - j, k = j * n + i, g = this.grid;
+    const a = g[k] + (g[k + 1] - g[k]) * tx, b = g[k + n] + (g[k + n + 1] - g[k + n]) * tx;
+    return a + (b - a) * tz;
+  }
+
+  /** Altura exacta a partir del ruido (para generar la malla y la rejilla). */
+  computeHeight(x: number, z: number): number {
     // Colinas grandes + detalle pequeño
     let h = 4 + this.noise.fbm(x * 0.006, z * 0.006, 4) * 22 + this.detail.fbm(x * 0.03, z * 0.03, 2) * 1.6;
     // Las colinas crecen hacia los bordes del mapa
@@ -75,7 +100,7 @@ export class Terrain {
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) {
-      pos.setY(i, this.heightAt(pos.getX(i), pos.getZ(i)));
+      pos.setY(i, this.computeHeight(pos.getX(i), pos.getZ(i)));
     }
     // Sin índices: cada triángulo tiene sus propios vértices y su propio color (look low-poly)
     const flat = geo.toNonIndexed();

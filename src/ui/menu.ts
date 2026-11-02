@@ -52,12 +52,12 @@ export class Menu {
       el.oninput = () => { this.settings[key] = Number(el.value) / 100; if (label) label.textContent = el.value; this.changed(); };
     };
     bindRange("s-master", "master"); bindRange("s-music", "music"); bindRange("s-sfx", "sfx");
-    const bindCheck = (id: string, key: "edgePan" | "help") => {
+    const bindCheck = (id: string, key: "edgePan" | "help" | "lowGraphics") => {
       const el = $(id) as HTMLInputElement;
       el.checked = this.settings[key];
       el.onchange = () => { this.settings[key] = el.checked; this.changed(); };
     };
-    bindCheck("s-edge", "edgePan"); bindCheck("s-help", "help");
+    bindCheck("s-edge", "edgePan"); bindCheck("s-help", "help"); bindCheck("s-low", "lowGraphics");
   }
 
   private changed() {

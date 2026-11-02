@@ -19,7 +19,7 @@ const options = {
   bundle: true,
   format: "iife",
   target: "es2020",
-  minify: !watch,
+  minify: !watch && !process.env.NOMIN,
   sourcemap: watch ? "inline" : false,
   write: false,
   plugins: [{ name: "inline-html", setup(b) { b.onEnd((r) => r.errors.length || inline(r)); } }],

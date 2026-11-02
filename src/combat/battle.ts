@@ -73,6 +73,8 @@ export class Regiment {
   flank: P | null = null;        // punto de rodeo para atacar por el flanco (IA)
   guard: { x: number; z: number; r: number; facing: number } | null = null; // guarnición: defiende su puesto
   size: number;                 // efectivos al formarse
+  colorKey?: string;            // caché de la vista
+  fleeFrom: Regiment | null = null; // enemigo más cercano mientras huye (se calcula una vez por paso)
 
   constructor(
     public id: number, public name: string, public team: Team, public type: UnitType,
@@ -242,6 +244,7 @@ export class Battle {
     for (const r of this.regiments) {
       if (r.state === "gone") continue;
       r.fighting = 0;
+      r.fleeFrom = r.state === "routing" ? this.nearestEnemyRegiment(r) : null;
       this.computeSlots(r);
       let err = 0;
       for (const s of r.alive) err += this.updateSoldier(s, dt);
@@ -367,10 +370,20 @@ export class Battle {
     return false;
   }
 
+  /** Huecos de la formación (seno y coseno una vez por regimiento; se reutilizan los objetos). */
   private computeSlots(r: Regiment) {
     const n = r.alive.length;
-    r.slots.length = n;
-    for (let i = 0; i < n; i++) r.slots[i] = r.slotPos(i, n);
+    if (r.slots.length > n) r.slots.length = n;
+    const f = Math.max(1, Math.min(r.files, n)), ranks = Math.ceil(n / f), sp = r.type.spacing;
+    const sn = Math.sin(r.facing), cs = Math.cos(r.facing);
+    for (let i = 0; i < n; i++) {
+      const rank = Math.floor(i / f);
+      const inRank = rank === ranks - 1 ? n - rank * f : f;
+      const lat = ((i % f) - (inRank - 1) / 2) * sp, back = rank * sp;
+      const x = r.x + cs * lat - sn * back, z = r.z - sn * lat - cs * back;
+      const o = r.slots[i];
+      if (o) { o.x = x; o.z = z; } else r.slots[i] = { x, z };
+    }
   }
 
   private nearestEnemyRegiment(r: Regiment): Regiment | null {
@@ -393,7 +406,7 @@ export class Battle {
     if (r.state === "routing") {
       // Huir lejos del enemigo más cercano
       s.target = null;
-      const e = this.nearestEnemyRegiment(r);
+      const e = r.fleeFrom;
       const ax = e ? s.x - e.cx : -r.fwd.x, az = e ? s.z - e.cz : -r.fwd.z;
       const l = Math.hypot(ax, az) || 1;
       gx = s.x + (ax / l) * 10; gz = s.z + (az / l) * 10;

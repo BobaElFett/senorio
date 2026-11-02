@@ -189,6 +189,9 @@ function applySettings(s: Settings) {
   rts.edgePan = s.edgePan;
   document.querySelectorAll(".edge").forEach((x) => (x.textContent = s.edgePan ? "activado" : "desactivado"));
   document.getElementById("help")!.hidden = !s.help;
+  // Gráficos sencillos: sin sombras y sin escalar a pantallas de alta densidad
+  sun.castShadow = !s.lowGraphics;
+  renderer.setPixelRatio(s.lowGraphics ? 1 : Math.min(window.devicePixelRatio, 2));
 }
 applySettings(settings);
 
