@@ -22,6 +22,8 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
   - El barón bandido (tercera incursión) y el modo libre traen jinetes; buscan a tus arqueros y evitan tus lanzas.
   - La batalla de prueba incluye jinetes en los dos bandos.
 - **Herrería** (10 madera, 20 monedas, 1 herrero): encargos de **armas** (+1 ataque y flechas más dañinas por nivel) y **armaduras** (+1 defensa y +1,5 de vida por nivel), dos niveles cada uno, de 4 a 6 días. Un encargo a la vez; se guarda con la partida.
+- **Bandidos más listos**: desde la segunda incursión llegan **por dos lados** (merodeadores por el norte; el barón manda la mesnada y los jinetes por el suroeste). El aviso dice por dónde vienen. En el modo libre los lados cambian en cada incursión.
+  - **Flanqueo**: si uno de tus regimientos está trabado, los demás bandidos lo rodean y entran por el costado o la espalda.
 - La barra de construcción pone un recurso por línea para caber en una fila; los avisos se colocan encima de la barra.
 
 ## Novedades 0.6 (noche del 1 al 2 de noviembre)

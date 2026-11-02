@@ -12,15 +12,30 @@ import { DAY_SECONDS, TOWER_RANGE, TOWER_RELOAD, TOWER_DAMAGE } from "../data/bu
  *  - Sobrevivir a las tres termina la partida
  */
 
-interface RaidSpec { day: number; name: string; from: P; units: [UnitKind, number, string][] }
+/** Cada grupo puede llegar por su lado (`from`); si no, por el de la incursión. */
+type RaidUnit = [UnitKind, number, string, P?];
+interface RaidSpec { day: number; name: string; from: P; units: RaidUnit[] }
+
+// Entradas al mapa (−x es el oeste, −z el norte)
+const ENTRY = {
+  oeste: { x: -175, z: 10 }, noroeste: { x: -120, z: -125 }, norte: { x: -40, z: -170 },
+  suroeste: { x: -115, z: 130 }, sur: { x: -10, z: 170 }, este: { x: 168, z: 20 },
+};
+
+/** «al oeste», «al norte»... según de dónde llegan. */
+export function sideName(p: P): string {
+  const a = Math.atan2(p.x, -p.z) * 180 / Math.PI;   // 0 = norte, 90 = este
+  const names = ["al norte", "al noreste", "al este", "al sureste", "al sur", "al suroeste", "al oeste", "al noroeste"];
+  return names[((Math.round(a / 45) % 8) + 8) % 8];
+}
 
 const RAIDS: RaidSpec[] = [
   { day: 20, name: "Una banda de ladrones", from: { x: -175, z: 10 },
     units: [["militia", 22, "Ladrones"]] },
   { day: 38, name: "Los saqueadores del bosque", from: { x: -175, z: -40 },
-    units: [["militia", 26, "Saqueadores"], ["archer", 14, "Arqueros bandidos"]] },
+    units: [["militia", 24, "Saqueadores"], ["archer", 14, "Arqueros bandidos"], ["militia", 12, "Merodeadores", ENTRY.norte]] },
   { day: 58, name: "La hueste del barón bandido", from: { x: -175, z: 30 },
-    units: [["spear", 30, "Lanceros del barón"], ["militia", 26, "Mesnada"], ["archer", 18, "Ballesteros"], ["cavalry", 10, "Jinetes del barón"]] },
+    units: [["spear", 30, "Lanceros del barón"], ["archer", 18, "Ballesteros"], ["militia", 26, "Mesnada", ENTRY.suroeste], ["cavalry", 10, "Jinetes del barón", ENTRY.suroeste]] },
 ];
 export type Difficulty = "facil" | "normal" | "dificil";
 export const DIFFICULTY: Record<Difficulty, { label: string; size: number; delay: number; note: string }> = {
@@ -60,16 +75,18 @@ export class Campaign {
     if (!base) {
       if (!this.endless) return null;
       const k = i - RAIDS.length + 1;
-      const froms = [{ x: -175, z: 0 }, { x: -170, z: -60 }, { x: -170, z: 60 }];
+      // Dos frentes que van cambiando: el grueso por un lado y la caballería con la mesnada por otro
+      const sides = [ENTRY.oeste, ENTRY.noroeste, ENTRY.suroeste, ENTRY.norte, ENTRY.sur, ENTRY.este];
+      const main = sides[k % sides.length], other = sides[(k * 3 + 1) % sides.length];
       base = {
-        day: RAIDS[RAIDS.length - 1].day + 20 * k, name: `La ${i + 1}.ª incursión`, from: froms[k % froms.length],
-        units: [["spear", 30 + 6 * k, "Lanceros"], ["militia", 26 + 5 * k, "Mesnada"], ["archer", 18 + 4 * k, "Ballesteros"], ["cavalry", 10 + 2 * k, "Jinetes"]],
+        day: RAIDS[RAIDS.length - 1].day + 20 * k, name: `La ${i + 1}.ª incursión`, from: main,
+        units: [["spear", 30 + 6 * k, "Lanceros"], ["archer", 18 + 4 * k, "Ballesteros"], ["militia", 26 + 5 * k, "Mesnada", other], ["cavalry", 10 + 2 * k, "Jinetes", other]],
       };
     }
     return {
       ...base,
       day: base.day + d.delay,
-      units: base.units.map(([kind, n, name]) => [kind, Math.max(8, Math.round(n * d.size)), name] as [UnitKind, number, string]),
+      units: base.units.map(([kind, n, name, from]) => [kind, Math.max(8, Math.round(n * d.size)), name, from] as RaidUnit),
     };
   }
   get raid(): RaidSpec | null {
@@ -131,7 +148,7 @@ export class Campaign {
     if (!r) return null;
     if (this.phase === "warning") {
       const left = Math.max(0, r.day - v.day);
-      return { text: `Bandidos al oeste (${r.name.toLowerCase()}): llegan en ${left < 1 ? Math.ceil(left * 24) + " horas" : Math.ceil(left) + " días"}. Recluta en el cuartel.`, kind: "warn" };
+      return { text: `Bandidos ${this.sides(r)} (${r.name.toLowerCase()}): llegan en ${left < 1 ? Math.ceil(left * 24) + " horas" : Math.ceil(left) + " días"}. Recluta en el cuartel.`, kind: "warn" };
     }
     if (this.phase === "raid") return { text: `Incursión ${this.raidIndex + 1}${this.endless ? "" : "/" + RAIDS.length}: ${r.name}. Sal a su encuentro antes de que lleguen a la aldea.`, kind: "raid" };
     if (this.phase === "plunder") return { text: `¡Saqueo! Los bandidos se llevan las provisiones y nadie trabaja.`, kind: "bad" };
@@ -191,7 +208,7 @@ export class Campaign {
     const lead = WARNING_DAYS + (this.watchTowers.length ? 1 : 0);
     if (this.phase === "calm" && r && v.day >= r.day - lead) {
       this.phase = "warning";
-      v.event(`¡Bandidos! Llegan en ${lead} días: ${r.name.toLowerCase()}${lead > WARNING_DAYS ? " (los ha avistado la torre)" : ""}`, "bad");
+      v.event(`¡Bandidos ${this.sides(r)}! Llegan en ${lead} días: ${r.name.toLowerCase()}${lead > WARNING_DAYS ? " (los ha avistado la torre)" : ""}`, "bad");
     }
     this.updateTowers(dt);
     if (this.phase === "warning" && r && v.day >= r.day) this.startRaid(r);
@@ -223,7 +240,7 @@ export class Campaign {
       // Se van por donde vinieron; desaparecen al llegar al borde o si huyen
       for (const x of this.raiders) {
         if (x.state === "gone") continue;
-        const from = r ? r.from : { x: -175, z: 0 };
+        const from = r ? this.homeOf(r, x) : { x: -175, z: 0 };
         if (x.active && (!x.path.length || x.order.kind !== "move")) b.orderMove(x, from.x, from.z, null, null);
         const arrived = Math.hypot(x.cx - from.x, x.cz - from.z) < 25 || (x.order.kind === "idle" && !x.path.length && this.withdrawTime > 0.2);
         if (arrived || x.state === "routing" || this.withdrawTime > 1.5) {
@@ -243,13 +260,36 @@ export class Campaign {
     this.phase = "raid";
     this.plunderTime = 0;
     this.loot = { wood: 0, food: 0, coins: 0 };
-    const facing = Math.atan2(-r.from.x, -r.from.z);
-    this.raiders = r.units.map(([kind, n, name], i) => {
-      const off = (i - (r.units.length - 1) / 2) * 26;
-      const x = r.from.x + Math.cos(facing) * off, z = r.from.z - Math.sin(facing) * off;
-      return this.battle.spawn(1, name, kind, x, z, facing, n);
-    });
-    this.village.event(`Han llegado ${this.raiders.reduce((s, x) => s + x.count, 0)} bandidos: ${r.name.toLowerCase()}`, "bad");
+    // Cada grupo forma en línea en su entrada
+    this.raiders = [];
+    for (const from of this.entries(r)) {
+      const group = r.units.filter((u) => (u[3] ?? r.from) === from);
+      const facing = Math.atan2(-from.x, -from.z);
+      group.forEach(([kind, n, name], i) => {
+        const off = (i - (group.length - 1) / 2) * 26;
+        const x = from.x + Math.cos(facing) * off, z = from.z - Math.sin(facing) * off;
+        this.raiders.push(this.battle.spawn(1, name, kind, x, z, facing, n));
+      });
+    }
+    this.village.event(`Han llegado ${this.raiders.reduce((s, x) => s + x.count, 0)} bandidos ${this.sides(r)}: ${r.name.toLowerCase()}`, "bad");
+  }
+
+  /** Entradas distintas por las que llega una incursión. */
+  entries(r: RaidSpec): P[] {
+    const out: P[] = [];
+    for (const u of r.units) { const f = u[3] ?? r.from; if (!out.includes(f)) out.push(f); }
+    return out;
+  }
+  /** «al oeste y al norte». */
+  sides(r: RaidSpec): string {
+    const names = [...new Set(this.entries(r).map(sideName))];
+    return names.length > 1 ? names.slice(0, -1).join(", ") + " y " + names[names.length - 1] : names[0];
+  }
+  /** Entrada de la incursión más cercana a un regimiento (por donde se retira). */
+  private homeOf(r: RaidSpec, x: Regiment): P {
+    let best = r.from, bd = Infinity;
+    for (const f of this.entries(r)) { const d = Math.hypot(f.x - x.cx, f.z - x.cz); if (d < bd) { bd = d; best = f; } }
+    return best;
   }
 
   private endRaid(victory: boolean) {

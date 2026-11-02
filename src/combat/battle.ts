@@ -70,6 +70,7 @@ export class Regiment {
   plundering = false;           // bandidos saqueando la aldea
   withdrawing = false;          // bandidos retirándose con el botín
   breach: WallRef | null = null; // tramo de empalizada que están derribando
+  flank: P | null = null;        // punto de rodeo para atacar por el flanco (IA)
   size: number;                 // efectivos al formarse
 
   constructor(
@@ -721,8 +722,32 @@ export class Battle {
         if (!free) { if (r.order.kind !== "idle") this.orderHalt(r); continue; }
         best = free;
       }
+      // Flanqueo: si el objetivo ya está trabado con otros bandidos, rodearlo y entrar por el lado o la espalda
+      if (r.type.range === 0 && r.state === "ok" && !r.engaged && best.engaged && best.state !== "routing") {
+        const p = this.flankPoint(r, best);
+        const far = Math.hypot(best.cx - r.cx, best.cz - r.cz) > 25;
+        if (far && Math.hypot(p.x - r.cx, p.z - r.cz) > 10) {
+          if (!r.flank || Math.hypot(r.flank.x - p.x, r.flank.z - p.z) > 10) {
+            r.flank = p;
+            this.orderMove(r, p.x, p.z, Math.atan2(best.cx - p.x, best.cz - p.z), null);
+          }
+          continue;
+        }
+      }
+      r.flank = null;
       if (r.order.kind !== "attack" || r.order.target !== best) this.orderAttack(r, best);
     }
+  }
+
+  /** Punto a un costado y algo por detrás del regimiento `t`, del lado por el que llega `r`. */
+  private flankPoint(r: Regiment, t: Regiment): P {
+    const right = t.right, fwd = t.fwd;
+    const side = (r.cx - t.cx) * right.x + (r.cz - t.cz) * right.z >= 0 ? 1 : -1;
+    const half = ((Math.min(t.files, t.count) - 1) * t.type.spacing) / 2;
+    const depth = (t.ranks - 1) * t.type.spacing;
+    const lat = half + 10, back = depth / 2 + 6;
+    const p = this.nav.nearestOpen(t.cx + right.x * side * lat - fwd.x * back, t.cz + right.z * side * lat - fwd.z * back, true);
+    return { x: p.x, z: p.z };
   }
 
   /** Punto a `off` m del centro del tramo, del lado de (x, z), y la normal hacia el muro. */

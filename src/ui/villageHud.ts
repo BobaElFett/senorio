@@ -228,7 +228,7 @@ export class VillageHud {
           el("p", v.res.flour < 1 && n ? "p-note neg" : "p-note", v.res.flour < 1 && n ? "Sin harina: construye un molino y ponle molinero." : `Pan en el almacén: ${Math.floor(v.res.bread)} · ${Math.round(v.breadShare * 100)}% de lo que se come es pan${v.breadShare > 0.5 ? " (+8 aprobación)" : ""}`));
       } else if (t.kind === "tower") {
         items.push(el("div", "p-row", n ? `Vigía en su puesto: avisa un día antes y dispara a ${TOWER_RANGE} m` : "Sin vigía: ni avisa ni dispara"),
-          el("p", "p-note", "Ponla en el lado por el que llegan los bandidos (el oeste)."));
+          el("p", "p-note", "Ponla en el lado por el que llegan los bandidos: la alerta dice por dónde vienen."));
       } else if (t.kind === "smithy") {
         const f = v.forging;
         if (f) {
