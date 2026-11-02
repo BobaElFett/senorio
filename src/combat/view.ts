@@ -15,6 +15,7 @@ const FLAG_COLORS = ["#2f58b0", "#a8302a"];
 // Colores ya convertidos: parsear «#rrggbb» por soldado y fotograma salía caro
 const TEAM_COLOR = new Map(Object.entries(TEAM_COLORS).map(([k, v]) => [k, new THREE.Color(v)]));
 const ROUT_GREY = new THREE.Color("#c9c3b5");
+const SHIELD_COLORS = ["#2f58b0", "#a8302a"];
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const CORPSE = new THREE.Color("#4a3d30");
 
@@ -31,6 +32,10 @@ export class BattleView {
   private headIndex = new Map<Soldier, [THREE.InstancedMesh, number]>();
   private bows!: THREE.InstancedMesh;
   private legs: THREE.InstancedMesh[] = [];
+  private arms: THREE.InstancedMesh[] = [];
+  private shields!: THREE.InstancedMesh;
+  private shieldIndex = new Map<Soldier, number>();
+  private armM = new THREE.Matrix4();
   private legM = new THREE.Matrix4();
   private hip = new THREE.Matrix4();
   private bowIndex = new Map<Soldier, number>();
@@ -75,21 +80,61 @@ export class BattleView {
     this.spearIndex.clear();
 
     // Torso (las piernas van aparte para poder moverlas al andar)
-    const body = new THREE.CylinderGeometry(0.22, 0.27, 0.66, 6);
-    body.translate(0, 0.86, 0);
-    const shield = new THREE.BoxGeometry(0.5, 0.65, 0.07);
-    shield.translate(-0.12, 0.75, 0.3);
-    const soldierGeo = mergeGeometries([body.toNonIndexed(), shield.toNonIndexed()])!;
+    const tint = (g: THREE.BufferGeometry, hex: string) => {
+      const n = g.toNonIndexed(), c = new THREE.Color(hex), arr = new Float32Array(n.attributes.position.count * 3);
+      for (let i = 0; i < arr.length; i += 3) { arr[i] = c.r; arr[i + 1] = c.g; arr[i + 2] = c.b; }
+      n.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+      return n;
+    };
+    // Torso con faldón de túnica y cinturón (el blanco toma el color del bando)
+    const torso = new THREE.CylinderGeometry(0.2, 0.25, 0.5, 6); torso.translate(0, 0.98, 0);
+    const skirt = new THREE.CylinderGeometry(0.26, 0.33, 0.34, 6); skirt.translate(0, 0.6, 0);
+    const belt = new THREE.CylinderGeometry(0.262, 0.262, 0.07, 6); belt.translate(0, 0.76, 0);
+    const soldierGeo = mergeGeometries([tint(torso, "#ffffff"), tint(skirt, "#e8e8e8"), tint(belt, "#4a3626")])!;
     soldierGeo.computeVertexNormals();
-    this.bodies = new THREE.InstancedMesh(soldierGeo, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.8 }), b.soldiers.length);
+    this.bodies = new THREE.InstancedMesh(soldierGeo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), b.soldiers.length);
+
+    // Brazos: el del escudo adelantado; el del arma golpea al atacar
+    const armGeo = new THREE.BoxGeometry(0.12, 0.52, 0.13); armGeo.translate(0, -0.24, 0);
+    const handGeo = new THREE.BoxGeometry(0.11, 0.1, 0.11); handGeo.translate(0, -0.52, 0);
+    const armFull = mergeGeometries([tint(armGeo, "#ffffff"), tint(handGeo, "#d6aa84")])!;
+    armFull.computeVertexNormals();
+    const armMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
+    this.arms = [0, 1].map(() => {
+      const m = new THREE.InstancedMesh(armFull, armMat, b.soldiers.length);
+      m.castShadow = true; m.frustumCulled = false;
+      this.group.add(m);
+      return m;
+    });
+
+    // Escudo de cometa con umbo, en el color del bando (los arqueros no llevan)
+    const board = new THREE.BoxGeometry(0.5, 0.72, 0.06);
+    const tip = new THREE.ConeGeometry(0.25, 0.3, 4); tip.rotateZ(Math.PI); tip.rotateY(Math.PI / 4); tip.scale(1, 1, 0.17); tip.translate(0, -0.5, 0);
+    const boss = new THREE.SphereGeometry(0.08, 6, 4); boss.translate(0, 0.05, 0.05);
+    const rim = new THREE.BoxGeometry(0.06, 0.74, 0.07); rim.translate(0, 0, 0);
+    const shieldGeo = mergeGeometries([tint(board, "#ffffff"), tint(tip, "#ffffff"), tint(boss, "#9aa0a6"), tint(rim, "#e8dcc0")])!;
+    shieldGeo.translate(-0.36, 0.92, 0.26);
+    shieldGeo.computeVertexNormals();
+    const shieldBearers = b.soldiers.filter((s) => s.reg.type.kind !== "archer");
+    this.shieldIndex.clear();
+    shieldBearers.forEach((s, i) => this.shieldIndex.set(s, i));
+    this.shields = new THREE.InstancedMesh(shieldGeo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7 }), Math.max(1, shieldBearers.length));
+    this.shields.castShadow = true; this.shields.frustumCulled = false;
+    if (!shieldBearers.length) this.shields.count = 0;
+    shieldBearers.forEach((s, i) => this.shields.setColorAt(i, this.c.set(SHIELD_COLORS[s.reg.team])));
+    if (this.shields.instanceColor) this.shields.instanceColor.needsUpdate = true;
+    this.group.add(this.shields);
     this.bodies.castShadow = true;
     this.bodies.frustumCulled = false;
 
-    const spearGeo = new THREE.CylinderGeometry(0.03, 0.03, 2.9, 4);
-    spearGeo.translate(0.3, 1.45, 0.15);
+    const shaft = new THREE.CylinderGeometry(0.028, 0.028, 2.9, 4); shaft.translate(0, 1.45, 0);
+    const head = new THREE.ConeGeometry(0.06, 0.32, 4); head.translate(0, 3.05, 0);
+    const spearGeo = mergeGeometries([tint(shaft, "#7a6044"), tint(head, "#b9bec4")])!;
+    spearGeo.computeVertexNormals();
+    spearGeo.translate(0.33, -0.15, 0.18);
     const spearHolders = b.soldiers.filter((s) => s.reg.type.kind !== "archer");
     spearHolders.forEach((s, i) => this.spearIndex.set(s, i));
-    this.spears = new THREE.InstancedMesh(spearGeo, new THREE.MeshStandardMaterial({ color: "#7a6044", flatShading: true }), Math.max(1, spearHolders.length));
+    this.spears = new THREE.InstancedMesh(spearGeo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true }), Math.max(1, spearHolders.length));
     this.spears.frustumCulled = false;
     this.group.add(this.bodies, this.spears);
 
@@ -134,12 +179,17 @@ export class BattleView {
       this.heads.set(kind, mesh);
       this.group.add(mesh);
     }
-    const bowGeo = new THREE.TorusGeometry(0.55, 0.03, 4, 10, Math.PI);
-    bowGeo.rotateZ(-Math.PI / 2);
-    bowGeo.translate(-0.42, 0.95, 0.12);
+    const bowArc = new THREE.TorusGeometry(0.55, 0.03, 4, 10, Math.PI);
+    bowArc.rotateZ(-Math.PI / 2);
+    bowArc.translate(-0.42, 0.95, 0.12);
+    // Aljaba a la espalda con plumas asomando
+    const quiver = new THREE.CylinderGeometry(0.09, 0.08, 0.55, 6); quiver.rotateZ(-0.35); quiver.translate(0.12, 1.05, -0.27);
+    const feathers = new THREE.BoxGeometry(0.14, 0.12, 0.1); feathers.rotateZ(-0.35); feathers.translate(0.22, 1.36, -0.27);
+    const bowGeo = mergeGeometries([tint(bowArc, "#5a3d22"), tint(quiver, "#6b4a2e"), tint(feathers, "#e9e4d6")])!;
+    bowGeo.computeVertexNormals();
     const archers = b.soldiers.filter((s) => s.reg.type.kind === "archer");
     archers.forEach((s, i) => this.bowIndex.set(s, i));
-    this.bows = new THREE.InstancedMesh(bowGeo, new THREE.MeshStandardMaterial({ color: "#5a3d22", flatShading: true }), Math.max(1, archers.length));
+    this.bows = new THREE.InstancedMesh(bowGeo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true }), Math.max(1, archers.length));
     this.bows.frustumCulled = false;
     if (!archers.length) this.bows.count = 0;
     this.group.add(this.bows);
@@ -278,11 +328,26 @@ export class BattleView {
         this.legM.multiplyMatrices(this.m, this.hip);
         this.legs[side].setMatrixAt(i, this.legM);
       }
+      // Brazos: 0 = izquierdo (escudo o arco), 1 = derecho (arma)
+      const archer = k === "archer";
+      const strike = s.attackAnim;
+      const armSwing = hi0 === undefined ? swing * 0.6 : 0;
+      for (let side = 0; side < 2; side++) {
+        let rx: number;
+        if (side === 0) rx = archer ? -1.2 * Math.min(1, strike * 2 + (s.reg.firing ? 1 : 0)) - 0.2 : -0.75;
+        else rx = archer ? -0.2 - strike * 1.3 + armSwing : -0.45 - strike * 1.4;
+        this.hip.makeRotationX(rx).setPosition(side ? 0.29 : -0.29, 1.18, side ? 0.02 : 0.04);
+        this.armM.multiplyMatrices(this.m, this.hip);
+        this.arms[side].setMatrixAt(i, this.armM);
+      }
+      const shi = this.shieldIndex.get(s);
+      if (shi !== undefined) this.shields.setMatrixAt(shi, s.fled ? ZERO : this.m);
       this.c.copy(TEAM_COLOR.get(s.reg.colorKey ??= `${s.reg.team}-${k}`)!);
       if (!s.alive) this.c.lerp(CORPSE, 0.55);
       else if (s.reg.state === "routing") this.c.lerp(ROUT_GREY, 0.45);
       else if (selected.has(s.reg)) this.c.offsetHSL(0, 0.05, 0.12);
       this.bodies.setColorAt(i, this.c);
+      this.arms[0].setColorAt(i, this.c); this.arms[1].setColorAt(i, this.c);
       const hi = this.headIndex.get(s);
       if (hi) hi[0].setMatrixAt(hi[1], this.m);
       const bi = this.bowIndex.get(s);
@@ -298,6 +363,8 @@ export class BattleView {
     this.spears.instanceMatrix.needsUpdate = true;
     this.bows.instanceMatrix.needsUpdate = true;
     this.horses.instanceMatrix.needsUpdate = true;
+    this.shields.instanceMatrix.needsUpdate = true;
+    for (const a of this.arms) { a.instanceMatrix.needsUpdate = true; if (a.instanceColor) a.instanceColor.needsUpdate = true; }
     for (const l of this.legs) l.instanceMatrix.needsUpdate = true;
     for (const h of this.heads.values()) h.instanceMatrix.needsUpdate = true;
 

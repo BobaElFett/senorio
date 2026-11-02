@@ -50,7 +50,7 @@ export class Rival {
     };
     place(keepModel(), 6, 0, 3, 10, 10);
     const houses: [number, number, number][] = [[-6, -16, 0], [6, -18, 0], [16, -10, 3], [-6, 16, 2], [6, 18, 2], [17, 10, 3], [24, 0, 3]];
-    for (const [x, z, r] of houses) place(buildingModel("house"), x, z, r, 7, 7);
+    houses.forEach(([x, z, r], i) => place(buildingModel("house", i + 1), x, z, r, 7, 7));
     place(buildingModel("barracks"), -8, -32, 0, 12, 10);
     place(buildingModel("storehouse"), -8, 30, 2, 11, 8);
     // Campos labrados alrededor

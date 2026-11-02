@@ -170,7 +170,7 @@ export class VillageView {
         bv.built = b.built;
         if (bv.site) { bv.root.remove(bv.site.group); bv.site = null; }
         if (bv.model) { bv.root.remove(bv.model); bv.model = null; }
-        if (b.built) { bv.model = buildingModel(b.type.kind); bv.root.add(bv.model); }
+        if (b.built) { bv.model = buildingModel(b.type.kind, b.id * 7 % 11); bv.root.add(bv.model); }
         else { bv.site = constructionModel(b.type.kind); bv.root.add(bv.site.group); }
       }
       if (bv.site) bv.site.walls.scale.y = Math.max(0.01, b.progress);

@@ -52,16 +52,39 @@ function logPile(x: number, z: number, n: number): THREE.Group {
   return g;
 }
 
-function house(): THREE.Group {
+// Variantes de casa: tejado, muros, chimenea y detalles cambian para que la aldea no sea un calco
+const HOUSE_LOOKS = [
+  { roof: C.thatch, wall: C.plaster, timber: C.timber, chim: -1.8 },
+  { roof: "#8f4f2f", wall: "#e8dcc2", timber: "#5a3d26", chim: 1.8 },
+  { roof: "#a88c52", wall: "#d9cba6", timber: "#6b4a2e", chim: -1.8 },
+  { roof: "#6e4a34", wall: "#efe6d0", timber: "#4f3622", chim: 1.6 },
+];
+
+function house(variant = 0): THREE.Group {
+  const L = HOUSE_LOOKS[variant % HOUSE_LOOKS.length];
   const g = new THREE.Group();
-  g.add(box(5.4, 2.8, 4.6, C.plaster));
-  // Entramado de madera en las esquinas
-  for (const [x, z] of [[-2.7, -2.3], [2.7, -2.3], [-2.7, 2.3], [2.7, 2.3]]) g.add(box(0.25, 2.8, 0.25, C.timber, x, 0, z));
-  g.add(box(5.6, 0.22, 4.8, C.timber, 0, 2.7, 0));
-  g.add(gable(6.2, 5.6, 2.2, C.thatch, 2.9));
+  g.add(box(5.4, 2.8, 4.6, L.wall));
+  // Zócalo de piedra
+  g.add(box(5.5, 0.45, 4.7, C.stone));
+  // Entramado de madera: esquinas, viga y una cruz en el muro lateral
+  for (const [x, z] of [[-2.7, -2.3], [2.7, -2.3], [-2.7, 2.3], [2.7, 2.3]]) g.add(box(0.25, 2.8, 0.25, L.timber, x, 0, z));
+  g.add(box(5.6, 0.22, 4.8, L.timber, 0, 2.7, 0));
+  const brace = box(0.16, 2.6, 0.16, L.timber, 0, 0, 0); brace.position.set(2.72, 1.4, 0); brace.rotation.x = 0.7; g.add(brace);
+  const brace2 = box(0.16, 2.6, 0.16, L.timber, 0, 0, 0); brace2.position.set(-2.72, 1.4, 0); brace2.rotation.x = -0.7; g.add(brace2);
+  g.add(gable(6.2, 5.6, 2.2, L.roof, 2.9));
+  g.add(box(6.3, 0.18, 0.3, L.timber, 0, 5.05, 0));                 // caballete
   g.add(box(1, 1.7, 0.12, C.door, 0.8, 0, 2.32));
-  g.add(box(0.7, 0.6, 0.1, C.darkWood, -1.4, 1.3, 2.32));
-  g.add(box(0.6, 1.6, 0.6, C.stone, -1.8, 3.6, -1));
+  g.add(box(1.2, 0.12, 0.2, L.timber, 0.8, 1.72, 2.36));            // dintel
+  // Ventana con contraventanas
+  g.add(box(0.7, 0.6, 0.1, "#2c2620", -1.4, 1.3, 2.32));
+  g.add(box(0.3, 0.64, 0.06, L.timber, -1.9, 1.28, 2.38), box(0.3, 0.64, 0.06, L.timber, -0.9, 1.28, 2.38));
+  g.add(box(0.6, 0.5, 0.1, "#2c2620", 0.2, 1.4, -2.32));            // ventana trasera
+  g.add(box(0.6, 1.6, 0.6, C.stone, L.chim, 3.6, -1));
+  g.add(box(0.72, 0.15, 0.72, "#7c786d", L.chim, 5.2, -1));
+  // Detalles detrás de la casa (delante van el huerto y el taller)
+  if (variant % 4 === 1) g.add(logPile(-1.6, -3.0, 4));
+  if (variant % 4 === 2) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.75, 8), mat(C.wood)); b.position.set(2.2, 0.37, -2.9); g.add(b); }
+  if (variant % 4 === 3) g.add(box(1.4, 0.4, 0.4, C.darkWood, -1.2, 0, -2.85), box(1.4, 0.08, 0.5, C.wood, -1.2, 0.4, -2.85)); // banco
   return g;
 }
 
@@ -328,8 +351,8 @@ export function keepModel(): THREE.Group {
   return g;
 }
 
-export function buildingModel(kind: BuildingKind): THREE.Group {
-  const g = BUILDERS[kind]();
+export function buildingModel(kind: BuildingKind, variant = 0): THREE.Group {
+  const g = kind === "house" ? house(variant) : BUILDERS[kind]();
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return g;
 }
