@@ -2,7 +2,7 @@ import { Village, LevyKind, LEVY } from "../settlement/village";
 import { Battle, Regiment } from "../combat/battle";
 import { UnitKind } from "../data/units";
 import { P } from "../world/navgrid";
-import { DAY_SECONDS } from "../data/buildings";
+import { DAY_SECONDS, TOWER_RANGE, TOWER_RELOAD, TOWER_DAMAGE } from "../data/buildings";
 
 /**
  * La partida: une aldea y combate en el mismo mapa.
@@ -90,6 +90,33 @@ export class Campaign {
     this.village.event("Modo libre: las incursiones seguirán, cada vez mayores", "info");
   }
   endlessShift = 0;
+  private towerReload = new Map<number, number>();
+
+  /** Torres con vigía: avisan antes y disparan a los bandidos que se acercan. */
+  private get watchTowers() { return this.village.buildings.filter((b) => b.built && b.type.kind === "tower" && b.workers.length > 0); }
+
+  private updateTowers(dt: number) {
+    for (const t of this.watchTowers) {
+      const left = (this.towerReload.get(t.id) ?? 0) - dt;
+      this.towerReload.set(t.id, left);
+      if (left > 0) continue;
+      // El bandido vivo más cercano a tiro
+      let best: { x: number; z: number } | null = null, bd = TOWER_RANGE;
+      for (const r of this.battle.regiments) {
+        if (r.team !== 1 || !r.alive.length || r.state === "gone") continue;
+        if (Math.hypot(r.cx - t.x, r.cz - t.z) > TOWER_RANGE + 20) continue;
+        for (const s of r.alive) {
+          const d = Math.hypot(s.x - t.x, s.z - t.z);
+          if (d < bd) { bd = d; best = s; }
+        }
+      }
+      if (!best) continue;
+      this.towerReload.set(t.id, TOWER_RELOAD * (0.85 + Math.random() * 0.3));
+      const spread = 0.8 + bd / 40;
+      const top = this.village.terrain.heightAt(t.x, t.z) + 8;
+      this.battle.shoot(t.x, top, t.z, best.x + (Math.random() - 0.5) * spread, best.z + (Math.random() - 0.5) * spread, 0, TOWER_DAMAGE);
+    }
+  }
 
   /** Texto del aviso de la parte superior (o null si no hay nada que avisar). */
   banner(): { text: string; kind: "warn" | "raid" | "good" | "bad"; action?: { label: string; run: () => void } } | null {
@@ -157,10 +184,12 @@ export class Campaign {
     }
 
     const r = this.raid;
-    if (this.phase === "calm" && r && v.day >= r.day - WARNING_DAYS) {
+    const lead = WARNING_DAYS + (this.watchTowers.length ? 1 : 0);
+    if (this.phase === "calm" && r && v.day >= r.day - lead) {
       this.phase = "warning";
-      v.event(`¡Bandidos! Llegan en ${WARNING_DAYS} días: ${r.name.toLowerCase()}`, "bad");
+      v.event(`¡Bandidos! Llegan en ${lead} días: ${r.name.toLowerCase()}${lead > WARNING_DAYS ? " (los ha avistado la torre)" : ""}`, "bad");
     }
+    this.updateTowers(dt);
     if (this.phase === "warning" && r && v.day >= r.day) this.startRaid(r);
 
     if (this.phase === "raid" || this.phase === "plunder") {

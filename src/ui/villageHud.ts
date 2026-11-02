@@ -1,7 +1,7 @@
 import { Village, Building, LevyKind, LEVY } from "../settlement/village";
 import { VillageControls, isWall, BuildTool } from "../settlement/villageControls";
 import { WALL, GATE, Wall } from "../settlement/village";
-import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR } from "../data/buildings";
+import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, TOWER_RANGE } from "../data/buildings";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
   const e = document.createElement(tag);
@@ -217,6 +217,9 @@ export class VillageHud {
       } else if (t.kind === "bakery") {
         items.push(el("div", "p-row", n ? `Cuece ${(n * BAKE_PER_WORKER).toFixed(0)} de harina al día → ${(n * BAKE_PER_WORKER * BREAD_PER_FLOUR).toFixed(0)} de pan` : "Parada: necesita un panadero"),
           el("p", v.res.flour < 1 && n ? "p-note neg" : "p-note", v.res.flour < 1 && n ? "Sin harina: construye un molino y ponle molinero." : `Pan en el almacén: ${Math.floor(v.res.bread)} · ${Math.round(v.breadShare * 100)}% de lo que se come es pan${v.breadShare > 0.5 ? " (+8 aprobación)" : ""}`));
+      } else if (t.kind === "tower") {
+        items.push(el("div", "p-row", n ? `Vigía en su puesto: avisa un día antes y dispara a ${TOWER_RANGE} m` : "Sin vigía: ni avisa ni dispara"),
+          el("p", "p-note", "Ponla en el lado por el que llegan los bandidos (el oeste)."));
       } else if (t.kind === "storehouse") {
         items.push(el("div", "p-row", `+${t.storage} de capacidad para cada recurso`));
       } else if (t.kind === "house") {

@@ -207,7 +207,30 @@ function bakery(): THREE.Group {
   return g;
 }
 
-const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery };
+function tower(): THREE.Group {
+  const g = new THREE.Group();
+  // Cuatro postes inclinados, plataforma con barandilla y tejadillo
+  for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) {
+    const p = box(0.32, 7.4, 0.32, C.timber, x * 0.85, 0, z * 0.85);
+    p.rotation.set(z * 0.035, 0, -x * 0.035);
+    g.add(p);
+  }
+  for (const y of [2.2, 4.4]) {
+    g.add(box(3.1, 0.14, 0.14, C.darkWood, 0, y, -1.4), box(3.1, 0.14, 0.14, C.darkWood, 0, y, 1.4));
+    g.add(box(0.14, 0.14, 3.1, C.darkWood, -1.4, y, 0), box(0.14, 0.14, 3.1, C.darkWood, 1.4, y, 0));
+  }
+  g.add(box(3.6, 0.22, 3.6, C.wood, 0, 7.2, 0));
+  for (const [w, d, x, z] of [[3.6, 0.12, 0, -1.75], [3.6, 0.12, 0, 1.75], [0.12, 3.6, -1.75, 0], [0.12, 3.6, 1.75, 0]] as const) g.add(box(w, 0.9, d, C.wood, x, 7.4, z));
+  for (const [x, z] of [[-1.7, -1.7], [1.7, -1.7], [-1.7, 1.7], [1.7, 1.7]]) g.add(box(0.14, 2.2, 0.14, C.timber, x, 7.4, z));
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.9, 1.8, 4), mat(C.roof));
+  roof.rotation.y = Math.PI / 4;
+  roof.position.y = 10.4;
+  g.add(roof);
+  g.add(box(0.5, 0.18, 2.4, C.darkWood, 0.9, 3.4, 0));   // escalera (simplificada)
+  return g;
+}
+
+const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower };
 
 export function buildingModel(kind: BuildingKind): THREE.Group {
   const g = BUILDERS[kind]();

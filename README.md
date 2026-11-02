@@ -16,6 +16,7 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Empalizada y puertas**: en la barra de construcción, clic en el inicio y clic en el final (la empalizada sigue encadenando tramos de 4 m, 1 madera cada uno; la puerta mide 5 m y cuesta 3). Las construyen las familias sin trabajo.
 - Los aldeanos y tus tropas cruzan las puertas; los bandidos no. Si no tienen otro camino, eligen un tramo y lo derriban a hachazos (unos 30 s una banda de 20); la brecha se abre en la navegación y siguen hacia la aldea.
 - Clic en un tramo: resistencia y demoler. Los tramos se guardan con la partida.
+- **Torre de vigía** (8 madera, 5 monedas, 1 vigía): las incursiones se avisan 3 días antes en vez de 2, y dispara flechas a los bandidos a 70 m.
 
 ## Novedades 0.6 (noche del 1 al 2 de noviembre)
 - **Dificultad** al empezar: fácil (bandidos −25% y 6 días más tarde), normal o difícil (+30% y 4 días antes).

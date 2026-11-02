@@ -1,6 +1,6 @@
 // Tipos de edificio de la aldea. Costes, tamaños y producción viven aquí.
 
-export type BuildingKind = "house" | "woodcutter" | "farm" | "storehouse" | "market" | "barracks" | "mill" | "bakery";
+export type BuildingKind = "house" | "woodcutter" | "farm" | "storehouse" | "market" | "barracks" | "mill" | "bakery" | "tower";
 export type Resource = "wood" | "food" | "coins" | "flour" | "bread";
 export const RESOURCES: Resource[] = ["wood", "food", "coins", "flour", "bread"];
 
@@ -46,13 +46,17 @@ export const BUILDINGS: Record<BuildingKind, BuildingType> = {
     kind: "bakery", label: "Panadería", description: "Cuece 3 de harina al día por panadero y saca 5 de pan. Las familias comen pan antes que grano.",
     cost: { wood: 6, coins: 10 }, buildDays: 3, w: 8, d: 7, workers: 1, housing: 0, storage: 0,
   },
+  tower: {
+    kind: "tower", label: "Torre", description: "Con un vigía, avista a los bandidos un día antes y les dispara flechas a 70 m.",
+    cost: { wood: 8, coins: 5 }, buildDays: 2, w: 5, d: 5, workers: 1, housing: 0, storage: 0,
+  },
   barracks: {
     kind: "barracks", label: "Cuartel", description: "Recluta lanceros y arqueros entre las familias de la aldea.",
     cost: { wood: 10, coins: 30 }, buildDays: 4, w: 12, d: 10, workers: 0, housing: 0, storage: 0,
   },
 };
 
-export const BUILD_ORDER: BuildingKind[] = ["house", "woodcutter", "farm", "mill", "bakery", "storehouse", "market", "barracks"];
+export const BUILD_ORDER: BuildingKind[] = ["house", "woodcutter", "farm", "mill", "bakery", "storehouse", "market", "barracks", "tower"];
 
 export const RESOURCE_LABEL: Record<Resource, string> = { wood: "Madera", food: "Grano", coins: "Monedas", flour: "Harina", bread: "Pan" };
 
@@ -70,3 +74,6 @@ export const MILL_PER_WORKER = 4;     // grano → harina, por día
 export const MILL_RESERVE = 10;       // el molino no toca los últimos 10 de grano
 export const BAKE_PER_WORKER = 3;     // harina por día
 export const BREAD_PER_FLOUR = 5 / 3;
+export const TOWER_RANGE = 70;        // m
+export const TOWER_RELOAD = 1.6;      // s entre flechas
+export const TOWER_DAMAGE = 5;

@@ -576,6 +576,18 @@ export class Battle {
     }
   }
 
+  /** Flecha disparada desde fuera de un regimiento (torre de vigía) hacia el punto (tx, tz). */
+  shoot(x: number, y: number, z: number, tx: number, tz: number, team: Team, dmg: number) {
+    const dist = Math.hypot(tx - x, tz - z);
+    const T = 1 + dist / 45;
+    const ty = this.terrain.heightAt(tx, tz);
+    this.arrows.push({
+      x, y, z, vx: (tx - x) / T, vz: (tz - z) / T, vy: (ty - y + 0.5 * GRAVITY * T * T) / T,
+      t: 0, T, team, dmg, landed: -1,
+    });
+    this.onEvent?.("fire", x, z);
+  }
+
   private updateArrows(dt: number) {
     for (let i = this.arrows.length - 1; i >= 0; i--) {
       const a = this.arrows[i];
