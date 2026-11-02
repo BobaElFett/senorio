@@ -30,7 +30,12 @@
   #obj-list li.done::marker { color: var(--good); }
   #obj-list li.current { color: var(--ink); font-weight: 600; }
   #obj-hint { margin: 2px 0 0; font-size: 12px; color: #e6dcc0; background: rgba(240,200,105,.08); border-radius: 4px; padding: 6px 8px; line-height: 1.45; }
-  #help h1 { font-size: 15px; margin: 0 0 6px; letter-spacing: .04em; }
+  #help h1 { font-size: 15px; margin: 0 0 6px; letter-spacing: .04em; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .help-toggle { display: none; font: inherit; font-size: 12px; font-weight: 500; background: transparent; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+  /* Con los objetivos en pantalla, la ayuda se pliega a su cabecera */
+  body[data-obj="1"] .help-toggle { display: inline-block; }
+  body[data-obj="1"] #help:not(.open) > :not(h1) { display: none; }
+  body[data-obj="1"] #help:not(.open) h1 { margin: 0; }
   #help h2 { font-size: 11px; margin: 8px 0 2px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); font-weight: 600; }
   #help p { margin: 1px 0; }
   #help .dim { color: var(--dim); margin-top: 6px; }
@@ -310,7 +315,7 @@
   <p id="obj-hint"></p>
 </div>
 <div id="help" class="panel">
-  <h1>Señorío · prototipo 0.11</h1>
+  <h1 id="help-head"><span>Señorío · prototipo 0.11</span><button type="button" id="help-toggle" class="help-toggle">Controles ▾</button></h1>
   <h2>Cámara</h2>
   <p><kbd>W A S D</kbd> mover · ratón al borde (<kbd>B</kbd>: <span class="edge">activado</span>)</p>
   <p>Rueda: zoom · <kbd>Q</kbd> <kbd>E</kbd> o botón central: girar</p>

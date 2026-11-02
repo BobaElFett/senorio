@@ -71,6 +71,8 @@ export class Objectives {
 
   update(dt: number, visible: boolean) {
     this.root.hidden = !visible || this.finished;
+    const obj = this.root.hidden ? "0" : "1";
+    if (document.body.dataset.obj !== obj) document.body.dataset.obj = obj;
     if (!visible) return;
     this.acc += dt;
     if (this.acc < 0.5) return;

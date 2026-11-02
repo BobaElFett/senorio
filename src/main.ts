@@ -189,6 +189,10 @@ const feedback = new Feedback(() => ({
   lands: regions.count("player"), montfort: rival.alive ? `vivo, ${rival.strength} tierras, le quitaste ${rival.taken}` : "rendido",
 }));
 menu.onFeedback = () => feedback.reset();
+{
+  const help = document.getElementById("help")!, btn = document.getElementById("help-toggle")!;
+  btn.onclick = () => { const open = help.classList.toggle("open"); btn.textContent = open ? "Controles ▴" : "Controles ▾"; btn.blur(); };
+}
 // Tras la primera incursión, una invitación (una sola vez) a dar la opinión
 let feedbackAsked = false;
 try { feedbackAsked = localStorage.getItem("senorio.fbAsked") === "1"; } catch { /* */ }

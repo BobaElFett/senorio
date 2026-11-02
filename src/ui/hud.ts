@@ -11,6 +11,7 @@ interface Card { el: HTMLElement; count: HTMLElement; bar: HTMLElement; state: H
  */
 export class Hud {
   private cards = new Map<Regiment, Card>();
+  private enemyTop = -1;
   private enemies = new Map<Regiment, Card>();
   private version = -1;
   private bar: HTMLElement;
@@ -157,6 +158,9 @@ export class Hud {
         this.bannerBtn.hidden = !act;
         if (act) { this.bannerBtn.textContent = act.label; this.bannerBtn.onclick = () => { act.run(); this.bannerBtn!.blur(); }; }
       }
+      // Las tarjetas enemigas, justo debajo del aviso (que puede ocupar una o dos líneas)
+      const top = this.banner.hidden ? 92 : this.banner.getBoundingClientRect().bottom + 8;
+      if (this.enemyTop !== top) { this.enemyTop = top; this.enemyList.style.top = `${top}px`; }
       return;
     }
     if (b.result !== null) {

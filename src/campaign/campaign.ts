@@ -202,7 +202,8 @@ export class Campaign {
     const facing = Math.atan2(barracks.door.x - barracks.x, barracks.door.z - barracks.z);
     // Soldado i → familia: se reparten en el orden de las familias
     const owners: number[] = [];
-    for (const f of fams) for (let k = 0; k < Math.min(per, f.members); k++) owners.push(f.id);
+    // Intercaladas: así las bajas de la primera fila no se ceban con una sola familia
+    for (let k = 0; k < per; k++) for (const f of fams) if (k < Math.min(per, f.members)) owners.push(f.id);
     const ahead = { x: barracks.door.x + Math.sin(facing) * 6, z: barracks.door.z + Math.cos(facing) * 6 };
     const reg = this.battle.spawn(0, `${LEVY[kind].label} ${roman}`, kind, ahead.x, ahead.z, facing, men, (i) => owners[i] ?? 0);
     v.applyLevy(kind, fams, reg.id);
