@@ -21,6 +21,7 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - Cámara: nunca mira al cielo vacío al acercarse.
 - Rendimiento: cada edificio se dibuja como una sola malla (una aldea de 75 edificios pasa de ~1.600 llamadas de dibujo a ~225).
 - La partida empieza a las 8 de la mañana, con luz de día.
+- IA: los arqueros enemigos que ven venir jinetes corren a refugiarse detrás de su infantería (antes se quedaban quietos).
 - Tras una victoria, el aviso recuerda licenciar los regimientos; si siguen ociosos tres días, otro aviso dice cuántos hombres no trabajan.
 
 ## Novedades 0.11 · fase 8 (acabado)

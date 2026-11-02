@@ -727,6 +727,17 @@ export class Battle {
       r.plundering = false;
       if (!best) { this.orderHalt(r); continue; }
       if (r.type.range > 0) {
+        // Si cargan jinetes contra ellos, los arqueros se refugian detrás de su infantería
+        const safe = this.shelterFromHorse(r);
+        if (safe) {
+          if (!r.flank || Math.hypot(r.flank.x - safe.x, safe.z - r.flank.z) > 8) {
+            r.flank = safe;
+            this.orderMove(r, safe.x, safe.z, null, null);
+            r.running = true;
+          }
+          continue;
+        }
+        r.flank = null;
         // Los arqueros enemigos no disparan a una melé: buscan blancos libres o esperan
         let free: Regiment | null = null, fd = Infinity;
         for (const o of this.regiments) {
@@ -766,6 +777,27 @@ export class Battle {
     if (tgt) { if (r.order.kind !== "attack" || r.order.target !== tgt) this.orderAttack(r, tgt); return; }
     if (r.order.kind === "attack") this.orderHalt(r);
     if (Math.hypot(r.x - g.x, r.z - g.z) > 10 && (r.order.kind !== "move" || !r.path.length)) this.orderMove(r, g.x, g.z, g.facing, null);
+  }
+
+  /** Punto detrás de la infantería propia, lejos de los jinetes que amenazan a `r` (o null si no hay peligro o refugio). */
+  private shelterFromHorse(r: Regiment): P | null {
+    let horse: Regiment | null = null, hd = 50;
+    for (const o of this.regiments) {
+      if (o.team === r.team || !o.active || !o.type.mounted || o.engaged) continue;
+      const d = Math.hypot(o.cx - r.cx, o.cz - r.cz);
+      if (d < hd) { hd = d; horse = o; }
+    }
+    if (!horse) return null;
+    let cover: Regiment | null = null, cd = 90;
+    for (const o of this.regiments) {
+      if (o.team !== r.team || o === r || !o.active || o.type.range > 0 || o.type.mounted) continue;
+      const d = Math.hypot(o.cx - r.cx, o.cz - r.cz) - (o.type.kind === "spear" ? 20 : 0);
+      if (d < cd) { cd = d; cover = o; }
+    }
+    if (!cover) return null;
+    const dx = cover.cx - horse.cx, dz = cover.cz - horse.cz, l = Math.hypot(dx, dz) || 1;
+    const p = this.nav.nearestOpen(cover.cx + (dx / l) * 14, cover.cz + (dz / l) * 14, r.team === 1);
+    return Math.hypot(p.x - r.cx, p.z - r.cz) < 8 ? null : { x: p.x, z: p.z };
   }
 
   /** Punto a un costado y algo por detrás del regimiento `t`, del lado por el que llega `r`. */
