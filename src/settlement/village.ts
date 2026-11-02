@@ -153,7 +153,12 @@ export class Village {
     this.mods.push({ label, value, until: this.day + days });
   }
 
+  /** Último día en que salió cada aviso: los repetidos (hambre, frío...) esperan unos días. */
+  private lastSaid = new Map<string, number>();
   event(text: string, kind: VillageEvent["kind"] = "info") {
+    const last = this.lastSaid.get(text);
+    if (kind === "bad" && last !== undefined && this.day - last < 3) return;
+    this.lastSaid.set(text, this.day);
     this.events.push({ id: this.nextEvent++, text, kind });
     if (this.events.length > 30) this.events.shift();
   }
@@ -342,6 +347,10 @@ export class Village {
     if (season !== prevSeason) {
       const msg = ["Llega la primavera: toca sembrar.", "Verano: los campos crecen.", "Otoño: tiempo de cosecha.", "Invierno: los campos descansan y las casas queman leña."][season];
       this.event(msg, season === 3 ? "bad" : "info");
+      // Los chicos crecen: cada estación, un hombre más en las familias que perdieron alguno
+      let back = 0;
+      for (const f of this.families) if (f.members < 4) { if (f.members === 0) back++; f.members++; }
+      if (back) this.event(`Los chicos crecen: ${back} familia${back > 1 ? "s vuelven" : " vuelve"} a tener hombres para la leva`, "info");
     }
 
     // Obras: las familias sin trabajo construyen, hasta 3 por obra, en orden
@@ -660,12 +669,11 @@ export class Village {
   casualty(familyId: number) {
     const f = this.families.find((x) => x.id === familyId);
     if (!f) return;
+    if (f.members <= 0) return;
     f.members--;
     this.addMod("Luto por los caídos", -8, 4);
-    if (f.members <= 0) {
-      this.removeFamily(f);
-      this.event(`La familia ${f.name} ha perdido a todos sus hombres`, "bad");
-    }
+    // La familia no desaparece: sigue trabajando, pero no puede ir a la leva hasta que crezcan los chicos
+    if (f.members === 0) this.event(`La familia ${f.name} ha perdido a todos sus hombres: no irá a la leva hasta la próxima estación`, "bad");
   }
 
   /** Los supervivientes del regimiento vuelven a casa. */

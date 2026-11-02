@@ -35,7 +35,7 @@ export class RtsCamera {
   setView(x: number, z: number, yaw: number, distance: number) {
     this.target.set(x, 0, z);
     this.yaw = yaw;
-    this.distance = this.targetDistance = distance;
+    this.distance = this.targetDistance = THREE.MathUtils.clamp(distance, this.minDistance, this.maxDistance);
     this.groundY = Math.max(0, this.terrain.heightAt(x, z));
     this.update(0);
   }
@@ -129,7 +129,7 @@ export class RtsCamera {
     this.target.y = this.groundY;
 
     // Inclinación según el zoom: cerca se ve más de lado, lejos más cenital
-    const t = (this.distance - this.minDistance) / (this.maxDistance - this.minDistance);
+    const t = THREE.MathUtils.clamp((this.distance - this.minDistance) / (this.maxDistance - this.minDistance), 0, 1);
     const pitch = THREE.MathUtils.lerp(0.55, 1.1, Math.sqrt(t));
     const horiz = Math.cos(pitch) * this.distance;
     const pos = this.camera.position;
