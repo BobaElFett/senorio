@@ -12,6 +12,12 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Sonido:** todo sintetizado en tiempo real (sin archivos): choques de armas, flechas, cargas, cuerno de alarma, campanas, martillos, viento, pájaros y grillos, música de laúd y tambores en las incursiones. Suena tras el primer clic.
 - **Compartir:** el juego es un único archivo (`dist/index.html`); también hay una versión jugable con enlace en claude.ai.
 
+## Novedades 0.9 · fase 6 (economía)
+- **Aserradero** (8 madera, 5 monedas, 2 aserradores): cada uno sierra 3 de madera al día en 2 **tablones**, sin bajar de 15 de madera (leña y obras).
+  - Piden tablones: el **establo** (6 madera, 8 tablones, 25 monedas), las armas y armaduras de **nivel 2** en la herrería y el **taller** de las casas.
+- **Comercio en el mercado** (con tendero): vender o comprar lotes de 10 de madera, grano, tablones y pan. Se compra caro y se vende barato; cada venta abarata el género y cada compra lo encarece, y los precios se recuperan en unos días. El grano vale más en invierno y menos en otoño.
+- **Mejoras de casa** (con 60% de aprobación o más): **huerto** (3 madera, 4 monedas: +0,35 de grano al día salvo en invierno) o **taller** (4 tablones, 6 monedas: +0,3 monedas al día). Las trabaja la familia sin dejar su oficio, se paran si está en la leva y cada casa mejorada suma 1 de aprobación (hasta 6).
+
 ## Novedades 0.8 · fase 5 (defensa)
 - **Empalizada y puertas**: en la barra de construcción, clic en el inicio y clic en el final (la empalizada sigue encadenando tramos de 4 m, 1 madera cada uno; la puerta mide 5 m y cuesta 3). Las construyen las familias sin trabajo.
 - Los aldeanos y tus tropas cruzan las puertas; los bandidos no. Si no tienen otro camino, eligen un tramo y lo derriban a hachazos (unos 30 s una banda de 20); la brecha se abre en la navegación y siguen hacia la aldea.

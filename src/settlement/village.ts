@@ -3,7 +3,7 @@ import { NavGrid, P } from "../world/navgrid";
 import { Forest, Tree } from "../world/forest";
 import {
   BUILDINGS, BuildingKind, BuildingType, Resource, RESOURCE_LABEL, RESOURCES,
-  MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR,
+  MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, SAW_PER_WORKER, PLANKS_PER_WOOD, SAW_RESERVE, lackText, HOUSE_EXTRAS, HouseExtra, EXTRA_MIN_APPROVAL, TradeGood, TRADE_GOODS, TRADE_BASE, TRADE_SEASON, TRADE_LOT, TRADE_SELL, TRADE_BUY,
   DAY_SECONDS, DAYS_PER_SEASON, SEASONS, BASE_STORAGE, FOOD_PER_FAMILY, FIREWOOD_PER_HOUSE, HORSE_FOOD, UPGRADES, Upgrade,
   WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY,
 } from "../data/buildings";
@@ -35,6 +35,7 @@ export interface Building {
   workers: Family[];
   residents: Family[];
   cutAcc: number;           // madera acumulada hasta talar el siguiente árbol
+  extra: HouseExtra | null; // mejora de casa (huerto o taller)
   rect: Rect;               // huella del edificio
   fieldRect: Rect | null;   // parcela (granja)
   door: P;
@@ -91,8 +92,8 @@ export const fwdOf = (rot: number): P => ({ x: Math.round(Math.sin(rot * Math.PI
  */
 export class Village {
   day = 0.27;                          // días desde el inicio (fracción = hora del día)
-  res: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0 };
-  rates: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0 };
+  res: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0, planks: 0 };
+  rates: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0, planks: 0 };
   breadShare = 0;                      // parte de lo que se come que es pan (0–1)
   /** Comida total: grano y pan. */
   get foodTotal() { return this.res.food + this.res.bread; }
@@ -109,6 +110,8 @@ export class Village {
   /** Equipos guardados en el cuartel (por familia) de regimientos licenciados. */
   equipment: Record<LevyKind, number> = { spear: 0, archer: 0, cavalry: 0 };
   mods: Modifier[] = [];
+  /** Presión de precios del mercado (1 = normal; sube al comprar, baja al vender, vuelve sola). */
+  pressure: Record<TradeGood, number> = { wood: 1, food: 1, planks: 1, bread: 1 };
   /** Mejoras de la herrería ya terminadas y la que se está forjando. */
   upgrades: Record<Upgrade, number> = { arms: 0, armor: 0 };
   forging: { kind: Upgrade; progress: number } | null = null;
@@ -155,7 +158,7 @@ export class Village {
   // ------------------------------------------------------------ montaje
   setup() {
     this.version++;
-    this.res = { wood: 30, food: 40, coins: 35, flour: 0, bread: 0 };
+    this.res = { wood: 30, food: 40, coins: 35, flour: 0, bread: 0, planks: 0 };
     const place = (kind: BuildingKind, x: number, z: number, rot: number) => {
       const b = this.addBuilding(kind, x, z, rot, true);
       return b;
@@ -255,7 +258,7 @@ export class Village {
     }
     if (!free) {
       for (const [r, n] of Object.entries(t.cost) as [Resource, number][]) {
-        if (this.res[r] < n) return { ok: false, reason: `Falta ${RESOURCE_LABEL[r].toLowerCase()} (${n})` };
+        if (this.res[r] < n) return { ok: false, reason: lackText(r, n) };
       }
     }
     return { ok: true, reason: "" };
@@ -265,7 +268,7 @@ export class Village {
     const { rect, field, door } = this.rects(kind, x, z, rot);
     const b: Building = {
       id: this.nextId++, type: BUILDINGS[kind], x, z, rot, built, progress: built ? 1 : 0,
-      workers: [], residents: [], cutAcc: 0, rect, fieldRect: field, door,
+      workers: [], residents: [], cutAcc: 0, rect, fieldRect: field, door, extra: null,
     };
     this.buildings.push(b);
     this.forest.clearRect(rect.minX, rect.minZ, rect.maxX, rect.maxZ);
@@ -390,6 +393,9 @@ export class Village {
       } else if (b.type.kind === "bakery") {
         const amt = Math.min(n * BAKE_PER_WORKER * dd, this.res.flour);
         this.res.flour -= amt; this.res.bread += amt * BREAD_PER_FLOUR;
+      } else if (b.type.kind === "sawmill") {
+        const amt = Math.max(0, Math.min(n * SAW_PER_WORKER * dd, this.res.wood - SAW_RESERVE));
+        this.res.wood -= amt; this.res.planks += amt * PLANKS_PER_WOOD;
       } else if (b.type.kind === "smithy" && this.forging) {
         const f = this.forging, spec = UPGRADES[f.kind].levels[this.upgrades[f.kind]];
         f.progress += (n * dd) / spec.days;
@@ -402,6 +408,18 @@ export class Village {
         const housed = this.families.filter((f) => f.home).length;
         this.res.coins += housed * TAX_PER_FAMILY * dd;
       }
+    }
+
+    // Los precios vuelven poco a poco a lo normal
+    for (const g of TRADE_GOODS) this.pressure[g] += (1 - this.pressure[g]) * Math.min(1, 0.15 * dd);
+
+    // Mejoras de casa: las trabaja la familia que vive allí, si no está en la leva
+    if (!this.underAttack) for (const h of this.houses) {
+      const f = h.residents[0];
+      if (!h.built || !h.extra || !f || f.levied !== null) continue;
+      const x = HOUSE_EXTRAS[h.extra];
+      if (season !== 3) this.res.food += x.food * dd;
+      this.res.coins += x.coins * dd;
     }
 
     // Consumo
@@ -448,6 +466,8 @@ export class Village {
     const market = this.buildings.some((b) => b.type.kind === "market" && b.built && b.workers.length);
     if (market) f.push({ label: "Mercado abierto", value: 10 });
     if (this.breadShare > 0.5) f.push({ label: "Comen pan", value: 8 });
+    const better = this.houses.filter((h) => h.extra && h.residents.length).length;
+    if (better) f.push({ label: `${better} casa${better > 1 ? "s" : ""} con huerto o taller`, value: Math.min(6, better) });
     this.mods = this.mods.filter((m) => m.until > this.day);
     for (const m of this.mods) f.push({ label: m.label, value: m.value });
     this.factors = f;
@@ -487,24 +507,82 @@ export class Village {
     f.work = null; f.home = null;
   }
 
+  // ------------------------------------------------------------ comercio
+  get marketOpen() { return this.buildings.some((b) => b.type.kind === "market" && b.built && b.workers.length > 0); }
+  unitPrice(g: TradeGood) {
+    const seasonal = g === "food" || g === "bread" ? TRADE_SEASON[this.season] : 1;
+    return TRADE_BASE[g] * seasonal * this.pressure[g];
+  }
+  /** Monedas que dan por un lote (vender) o que cuesta (comprar). */
+  lotPrice(g: TradeGood, side: "sell" | "buy") {
+    const p = this.unitPrice(g) * TRADE_LOT;
+    return side === "sell" ? Math.max(1, Math.floor(p * TRADE_SELL)) : Math.ceil(p * TRADE_BUY);
+  }
+  tradePlan(g: TradeGood, side: "sell" | "buy"): { coins: number; ok: boolean; reason: string } {
+    const coins = this.lotPrice(g, side);
+    let reason = "";
+    if (!this.marketOpen) reason = "El mercado necesita un tendero";
+    else if (this.underAttack) reason = "No hay tratos durante el saqueo";
+    else if (side === "sell" && this.res[g] < TRADE_LOT) reason = `No hay ${TRADE_LOT}`;
+    else if (side === "buy" && this.res.coins < coins) reason = `Faltan monedas (${coins})`;
+    else if (side === "buy" && this.res[g] + TRADE_LOT > this.capacity()) reason = "No cabe en el almacén";
+    return { coins, ok: !reason, reason };
+  }
+  trade(g: TradeGood, side: "sell" | "buy"): boolean {
+    const plan = this.tradePlan(g, side);
+    if (!plan.ok) return false;
+    if (side === "sell") { this.res[g] -= TRADE_LOT; this.res.coins += plan.coins; this.pressure[g] = Math.max(0.5, this.pressure[g] * 0.93); }
+    else { this.res[g] += TRADE_LOT; this.res.coins -= plan.coins; this.pressure[g] = Math.min(2, this.pressure[g] * 1.07); }
+    this.version++;
+    return true;
+  }
+
+  // ------------------------------------------------------------ mejoras de casa
+  extraPlan(h: Building, kind: HouseExtra): { ok: boolean; reason: string } {
+    let reason = "";
+    if (h.type.kind !== "house" || !h.built) reason = "Solo en casas terminadas";
+    else if (h.extra) reason = "Esta casa ya tiene mejora";
+    else if (!h.residents.length) reason = "No vive nadie";
+    else if (this.approval < EXTRA_MIN_APPROVAL) reason = `Hace falta ${EXTRA_MIN_APPROVAL}% de aprobación`;
+    else reason = this.lack(HOUSE_EXTRAS[kind].cost);
+    return { ok: !reason, reason };
+  }
+
+  upgradeHouse(h: Building, kind: HouseExtra): boolean {
+    if (!this.extraPlan(h, kind).ok) return false;
+    this.pay(HOUSE_EXTRAS[kind].cost);
+    h.extra = kind;
+    this.version++;
+    this.event(`La familia ${h.residents[0].name} pone un ${HOUSE_EXTRAS[kind].label.toLowerCase()} en su casa`, "good");
+    return true;
+  }
+
   // ------------------------------------------------------------ herrería
   /** Coste de la siguiente mejora de esa línea y si se puede empezar. */
-  forgePlan(kind: Upgrade): { level: number; wood: number; coins: number; days: number; ok: boolean; reason: string } {
+  forgePlan(kind: Upgrade): { level: number; cost: Partial<Record<Resource, number>>; days: number; ok: boolean; reason: string } {
     const level = this.upgrades[kind];
     const spec = UPGRADES[kind].levels[level];
-    if (!spec) return { level, wood: 0, coins: 0, days: 0, ok: false, reason: "Nivel máximo" };
+    if (!spec) return { level, cost: {}, days: 0, ok: false, reason: "Nivel máximo" };
     let reason = "";
     if (!this.has("smithy")) reason = "Hace falta una herrería terminada";
     else if (this.forging) reason = this.forging.kind === kind ? "Ya se está forjando" : "El herrero está con otro encargo";
-    else if (this.res.wood < spec.wood) reason = `Falta madera (${spec.wood})`;
-    else if (this.res.coins < spec.coins) reason = `Faltan monedas (${spec.coins})`;
-    return { level, ...spec, ok: !reason, reason };
+    else reason = this.lack(spec.cost);
+    return { level, cost: spec.cost, days: spec.days, ok: !reason, reason };
+  }
+
+  /** Motivo por el que no alcanza para pagar `cost` ("" si alcanza). */
+  lack(cost: Partial<Record<Resource, number>>): string {
+    for (const [r, n] of Object.entries(cost) as [Resource, number][]) if (this.res[r] < n) return lackText(r, n);
+    return "";
+  }
+  pay(cost: Partial<Record<Resource, number>>) {
+    for (const [r, n] of Object.entries(cost) as [Resource, number][]) this.res[r] -= n;
   }
 
   startForge(kind: Upgrade): boolean {
     const plan = this.forgePlan(kind);
     if (!plan.ok) return false;
-    this.res.wood -= plan.wood; this.res.coins -= plan.coins;
+    this.pay(plan.cost);
     this.forging = { kind, progress: 0 };
     this.version++;
     return true;

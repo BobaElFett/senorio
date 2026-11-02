@@ -22,9 +22,9 @@ export interface SaveData {
   summary: string;
   village: {
     day: number; res: Village["res"]; approval: number; mods: Village["mods"]; equipment?: Village["equipment"];
-    upgrades?: Village["upgrades"]; forging?: Village["forging"];
+    upgrades?: Village["upgrades"]; forging?: Village["forging"]; pressure?: Village["pressure"];
     nextId: number; nameIdx: number;
-    buildings: { id: number; kind: BuildingKind; x: number; z: number; rot: number; built: boolean; progress: number; cutAcc: number }[];
+    buildings: { id: number; kind: BuildingKind; x: number; z: number; rot: number; built: boolean; progress: number; cutAcc: number; extra?: Building["extra"] }[];
     families: { id: number; name: string; home: number | null; work: number | null; prev: number | null; members: number; levied: number | null; x: number; z: number }[];
   };
   felled: number[];
@@ -47,9 +47,9 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
     summary: `${summarize(v)} · ${c.difficulty === "facil" ? "fácil" : c.difficulty === "dificil" ? "difícil" : "normal"}`,
     village: {
       day: v.day, res: { ...v.res }, approval: v.approval, mods: v.mods.map((m) => ({ ...m })), equipment: { ...v.equipment },
-      upgrades: { ...v.upgrades }, forging: v.forging ? { ...v.forging } : null,
+      upgrades: { ...v.upgrades }, pressure: { ...v.pressure }, forging: v.forging ? { ...v.forging } : null,
       nextId: vv.nextId, nameIdx: vv.nameIdx,
-      buildings: v.buildings.map((x) => ({ id: x.id, kind: x.type.kind, x: x.x, z: x.z, rot: x.rot, built: x.built, progress: x.progress, cutAcc: x.cutAcc })),
+      buildings: v.buildings.map((x) => ({ id: x.id, kind: x.type.kind, x: x.x, z: x.z, rot: x.rot, built: x.built, progress: x.progress, cutAcc: x.cutAcc, extra: x.extra })),
       families: v.families.map((f) => ({
         id: f.id, name: f.name, home: f.home?.id ?? null, work: f.work?.id ?? null, prev: f.prevWork?.id ?? null,
         members: f.members, levied: f.levied, x: f.v.x, z: f.v.z,
@@ -72,16 +72,17 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   for (const i of d.felled) { const t = forest.trees[i]; if (t) forest.fell(t); }
 
   v.day = d.village.day;
-  v.res = Object.assign({ wood: 0, food: 0, coins: 0, flour: 0, bread: 0 }, d.village.res);
+  v.res = Object.assign({ wood: 0, food: 0, coins: 0, flour: 0, bread: 0, planks: 0 }, d.village.res);
   v.approval = v.approvalTarget = d.village.approval;
   v.mods = d.village.mods.map((m) => ({ ...m }));
   v.equipment = { spear: 0, archer: 0, cavalry: 0, ...(d.village.equipment ?? {}) };
   v.upgrades = { arms: 0, armor: 0, ...(d.village.upgrades ?? {}) };
+  v.pressure = { wood: 1, food: 1, planks: 1, bread: 1, ...(d.village.pressure ?? {}) };
   v.forging = d.village.forging ? { ...d.village.forging } : null;
   const byId = new Map<number, Building>();
   for (const s of d.village.buildings) {
     const bld: Building = vv.addBuilding(s.kind, s.x, s.z, s.rot, s.built);
-    bld.id = s.id; bld.progress = s.progress; bld.cutAcc = s.cutAcc;
+    bld.id = s.id; bld.progress = s.progress; bld.cutAcc = s.cutAcc; bld.extra = s.extra ?? null;
     byId.set(s.id, bld);
   }
   for (const s of d.village.families) {

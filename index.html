@@ -124,6 +124,13 @@
   .w-btn { font: inherit; font-weight: 700; width: 28px; height: 26px; background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
   .w-btn:disabled { opacity: .35; cursor: default; }
   .w-count { font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; font-weight: 600; }
+  .trade { display: grid; grid-template-columns: 1fr 64px 64px; gap: 4px 6px; align-items: center; font-size: 13px; }
+  .trade-h { font-size: 11px; color: var(--dim); }
+  .trade-name small { color: var(--dim); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .trade-btn { font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 0; border-radius: 4px; cursor: pointer; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink); }
+  .trade-btn.sell { color: #9fd38a; }
+  .trade-btn.buy { color: #e8b48a; }
+  .trade-btn:disabled { opacity: .35; cursor: default; }
   .p-del { font: inherit; font-size: 12px; margin-top: 4px; background: transparent; color: var(--bad); border: 1px solid rgba(224,103,90,.5); border-radius: 4px; padding: 5px; cursor: pointer; }
   .p-del:disabled { opacity: .4; cursor: default; }
 
@@ -246,7 +253,7 @@
   <p id="obj-hint"></p>
 </div>
 <div id="help" class="panel">
-  <h1>Señorío · prototipo 0.8</h1>
+  <h1>Señorío · prototipo 0.9</h1>
   <h2>Cámara</h2>
   <p><kbd>W A S D</kbd> mover · ratón al borde (<kbd>B</kbd>: <span class="edge">activado</span>)</p>
   <p>Rueda: zoom · <kbd>Q</kbd> <kbd>E</kbd> o botón central: girar</p>
@@ -260,6 +267,8 @@
     <p>Cuartel: reclutar entre las familias</p>
     <p>Establo: jinetes (cargan por el flanco y la espalda; evita las lanzas de frente)</p>
     <p>Herrería: mejores armas y armaduras para tus tropas</p>
+    <p>Mercado con tendero: comprar y vender en lotes de 10</p>
+    <p>Clic en una casa (60% de aprobación): huerto o taller</p>
     <p>Empalizada y puerta: clic inicio, clic final</p>
     <p>Tropas: clic, recuadro, <kbd>1</kbd>–<kbd>9</kbd> · clic der.: mover o atacar</p>
     <p>Arrastrar clic der.: frente · <kbd>X</kbd>: alto</p>

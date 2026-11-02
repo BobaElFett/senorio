@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Village, Building, Rect, Wall, WALL, GATE } from "./village";
-import { buildingModel, constructionModel } from "./models";
+import { buildingModel, constructionModel, houseExtraModel } from "./models";
 import { BuildingKind } from "../data/buildings";
 import { Terrain } from "../world/terrain";
 
@@ -11,6 +11,8 @@ interface BView {
   site: { group: THREE.Group; walls: THREE.Mesh } | null;
   field: THREE.Mesh | null;
   built: boolean;
+  extra: THREE.Group | null;
+  extraKind: string | null;
 }
 
 const JOB_COLOR: Record<string, string> = {
@@ -123,7 +125,7 @@ export class VillageView {
     found.receiveShadow = true;
     root.add(found);
     this.group.add(root);
-    const v: BView = { root, model: null, site: null, field: null, built: !b.built };
+    const v: BView = { root, model: null, site: null, field: null, built: !b.built, extra: null, extraKind: null };
     if (b.fieldRect) {
       v.field = this.makeField(b.fieldRect, b.rot);
       v.field.userData.building = b;
@@ -172,6 +174,12 @@ export class VillageView {
         else { bv.site = constructionModel(b.type.kind); bv.root.add(bv.site.group); }
       }
       if (bv.site) bv.site.walls.scale.y = Math.max(0.01, b.progress);
+      if ((b.built ? b.extra : null) !== bv.extraKind) {
+        if (bv.extra) bv.root.remove(bv.extra);
+        bv.extraKind = b.built ? b.extra : null;
+        bv.extra = bv.extraKind ? houseExtraModel(bv.extraKind as "garden" | "workshop") : null;
+        if (bv.extra) bv.root.add(bv.extra);
+      }
       // Aspas del molino: giran mientras hay molinero y grano que moler
       if (bv.model && b.type.kind === "mill" && b.workers.length && v.res.food > 10 && !v.underAttack) {
         bv.model.traverse((o) => { if (o.userData.spin) o.rotation.z -= dt * 1.2; });

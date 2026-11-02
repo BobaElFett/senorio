@@ -272,7 +272,43 @@ function smithy(): THREE.Group {
   return g;
 }
 
-const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower, stable, smithy };
+function sawmill(): THREE.Group {
+  const g = new THREE.Group();
+  // Cobertizo abierto con banco de sierra, tronco en caballetes y pila de tablones
+  for (const [x, z] of [[-3.8, -2.6], [3.8, -2.6], [-3.8, 1.2], [3.8, 1.2]]) g.add(box(0.3, 2.9, 0.3, C.timber, x, 0, z));
+  const roof = box(8.6, 0.2, 4.8, C.thatch, 0, 2.9, -0.7); roof.rotation.x = 0.14; g.add(roof);
+  g.add(box(8, 1.6, 0.2, C.wood, 0, 0, -2.75));
+  for (const x of [-2.4, 0, 2.4]) g.add(box(0.25, 0.9, 1.1, C.darkWood, x, 0, -0.8));   // caballetes
+  const log = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 6.4, 7), mat(C.wood));
+  log.rotation.z = Math.PI / 2; log.position.set(0, 1.25, -0.8); g.add(log);
+  g.add(box(0.06, 1.4, 0.7, "#8a8e92", 0.6, 0.9, -0.8));                                  // sierra
+  for (let i = 0; i < 5; i++) g.add(box(3.4, 0.12, 0.5, "#c9a370", 2.2, i * 0.14, 2.6 - (i % 2) * 0.1)); // tablones
+  for (let i = 0; i < 4; i++) g.add(box(3.4, 0.12, 0.5, "#c9a370", 2.2, i * 0.14, 3.2));
+  g.add(logPile(-2.6, 2.6, 5));
+  return g;
+}
+
+const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower, stable, smithy, sawmill };
+
+/** Mejora de casa: huerto delante a la izquierda o taller con tejadillo a la derecha. */
+export function houseExtraModel(kind: "garden" | "workshop"): THREE.Group {
+  const g = new THREE.Group();
+  if (kind === "garden") {
+    g.add(box(2.6, 0.12, 1.1, "#5a4030", -1.7, 0, 2.95));
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) g.add(box(0.32, 0.3, 0.32, i % 2 ? "#6f9a3a" : "#4f8a34", -2.7 + i * 0.65, 0.1, 2.7 + j * 0.5));
+    for (let i = 0; i < 5; i++) g.add(box(0.07, 0.6, 0.07, C.timber, -3.05 + i * 0.68, 0, 3.5));
+    g.add(box(2.8, 0.06, 0.05, C.timber, -1.7, 0.45, 3.5));
+  } else {
+    for (const x of [1.6, 3.2]) g.add(box(0.14, 2, 0.14, C.timber, x, 0, 3.3));
+    const roof = box(2, 0.1, 1.2, C.roof, 2.4, 2.0, 2.85); roof.rotation.x = -0.25; g.add(roof);
+    g.add(box(1.3, 0.75, 0.5, C.darkWood, 2.4, 0, 2.75));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.7, 8), mat(C.wood));
+    barrel.position.set(3.15, 0.35, 2.75); g.add(barrel);
+    g.add(box(0.7, 0.08, 0.35, "#c9a370", 2.2, 0.75, 2.75));
+  }
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return g;
+}
 
 export function buildingModel(kind: BuildingKind): THREE.Group {
   const g = BUILDERS[kind]();

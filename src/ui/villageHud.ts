@@ -1,7 +1,7 @@
 import { Village, Building, LevyKind, LEVY } from "../settlement/village";
 import { VillageControls, isWall, BuildTool } from "../settlement/villageControls";
 import { WALL, GATE, Wall } from "../settlement/village";
-import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, TOWER_RANGE, UPGRADES, Upgrade } from "../data/buildings";
+import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, TOWER_RANGE, UPGRADES, Upgrade, costLine, TRADE_GOODS, HOUSE_EXTRAS, HouseExtra, EXTRA_MIN_APPROVAL, SAW_PER_WORKER, PLANKS_PER_WOOD, SAW_RESERVE } from "../data/buildings";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
   const e = document.createElement(tag);
@@ -96,7 +96,8 @@ export class VillageHud {
     this.res.replaceChildren();
     // Harina y pan solo aparecen cuando hay molino o panadería (o existencias)
     const chain = v.buildings.some((b) => b.type.kind === "mill" || b.type.kind === "bakery") || v.res.flour + v.res.bread > 0.5;
-    const shown: Resource[] = chain ? ["wood", "food", "flour", "bread", "coins"] : ["wood", "food", "coins"];
+    const saw = v.buildings.some((b) => b.type.kind === "sawmill") || v.res.planks > 0.5;
+    const shown: Resource[] = ["wood", ...(saw ? ["planks"] as Resource[] : []), "food", ...(chain ? ["flour", "bread"] as Resource[] : []), "coins"];
     for (const r of shown) {
       const box = el("div", `res res-${r}`);
       const rate = v.rates[r];
@@ -177,7 +178,9 @@ export class VillageHud {
     const levyKinds = (Object.keys(LEVY) as LevyKind[]).filter((k) => LEVY[k].at === b.type.kind);
     const levyKey = levyKinds.length ? levyKinds.map((k) => { const p = this.v.levyPlan(k); return `${p.ok}${p.families.length}${p.reason}${p.reused}`; }).join("|") : "";
     const forgeKey = b.type.kind === "smithy" ? `${JSON.stringify(this.v.upgrades)}${this.v.forging ? Math.floor(this.v.forging.progress * 50) : "-"}${(["arms", "armor"] as Upgrade[]).map((k) => this.v.forgePlan(k).reason).join()}` : "";
-    const key = `${forgeKey}${b.id}-${b.built}-${b.workers.length}-${b.residents.length}-${this.v.idle.length}-${Math.floor(b.progress * 100)}-${this.v.season}-${levyKey}`;
+    const houseKey = b.type.kind === "house" ? `${b.extra}${(["garden", "workshop"] as HouseExtra[]).map((k) => this.v.extraPlan(b, k).reason).join()}` : "";
+    const tradeKey = b.type.kind === "market" ? TRADE_GOODS.map((g) => `${Math.floor(this.v.res[g] / 10)}${this.v.lotPrice(g, "sell")}${this.v.lotPrice(g, "buy")}`).join() + Math.floor(this.v.res.coins / 5) : "";
+    const key = `${tradeKey}${houseKey}${forgeKey}${b.id}-${b.built}-${b.workers.length}-${b.residents.length}-${this.v.idle.length}-${Math.floor(b.progress * 100)}-${this.v.season}-${levyKey}`;
     if (this.panelFor === b && this.panel.dataset.key === key) return;
     this.panelFor = b;
     this.panel.dataset.key = key;
@@ -219,6 +222,28 @@ export class VillageHud {
       } else if (t.kind === "market") {
         const housed = v.families.filter((f) => f.home).length;
         items.push(el("div", "p-row", n ? `Impuestos: ${(housed * TAX_PER_FAMILY).toFixed(1)} monedas/día · +10 aprobación` : "Cerrado: necesita un tendero"));
+        // Comercio: lotes de 10, precios que se mueven con cada trato y con la estación
+        const table = el("div", "trade");
+        table.append(el("span", "trade-h", "Lotes de 10"), el("span", "trade-h", "Vender"), el("span", "trade-h", "Comprar"));
+        for (const g of TRADE_GOODS) {
+          if (g === "planks" && !v.res.planks && !v.has("sawmill")) continue;
+          if (g === "bread" && !v.res.bread && !v.has("bakery")) continue;
+          const name = el("span", "trade-name", `${RESOURCE_LABEL[g]} `);
+          name.append(el("small", "", `${Math.floor(v.res[g])}`));
+          table.append(name);
+          for (const side of ["sell", "buy"] as const) {
+            const plan = v.tradePlan(g, side);
+            const btn = el("button", `trade-btn ${side}`, side === "sell" ? `+${plan.coins}` : `−${plan.coins}`);
+            btn.type = "button";
+            btn.disabled = !plan.ok;
+            btn.title = plan.ok ? (side === "sell" ? `Vender 10 de ${RESOURCE_LABEL[g].toLowerCase()} por ${plan.coins} monedas` : `Comprar 10 de ${RESOURCE_LABEL[g].toLowerCase()} por ${plan.coins} monedas`) : plan.reason;
+            btn.onclick = () => { v.trade(g, side); this.invalidate(); };
+            table.append(btn);
+          }
+        }
+        items.push(table, el("p", "p-note", n
+          ? "Cada venta abarata ese género y cada compra lo encarece; los precios se recuperan en unos días. El grano vale más en invierno y menos en otoño."
+          : "Sin tendero no hay tratos."));
       } else if (t.kind === "mill") {
         const can = Math.max(0, v.res.food - MILL_RESERVE);
         items.push(el("div", "p-row", n ? `Muele ${(n * MILL_PER_WORKER).toFixed(0)} de grano al día en harina` : "Parado: necesita un molinero"),
@@ -229,6 +254,10 @@ export class VillageHud {
       } else if (t.kind === "tower") {
         items.push(el("div", "p-row", n ? `Vigía en su puesto: avisa un día antes y dispara a ${TOWER_RANGE} m` : "Sin vigía: ni avisa ni dispara"),
           el("p", "p-note", "Ponla en el lado por el que llegan los bandidos: la alerta dice por dónde vienen."));
+      } else if (t.kind === "sawmill") {
+        const can = Math.max(0, v.res.wood - SAW_RESERVE);
+        items.push(el("div", "p-row", n ? `Sierra ${(n * SAW_PER_WORKER).toFixed(0)} de madera al día → ${(n * SAW_PER_WORKER * PLANKS_PER_WOOD).toFixed(0)} tablones` : "Parado: necesita aserradores"),
+          el("p", can < 1 && n ? "p-note neg" : "p-note", can < 1 && n ? `Poca madera: deja ${SAW_RESERVE} siempre para leña y obras.` : `Tablones en el almacén: ${Math.floor(v.res.planks)}. Los piden el establo, las mejoras de casa y la herrería de nivel 2.`));
       } else if (t.kind === "smithy") {
         const f = v.forging;
         if (f) {
@@ -243,7 +272,7 @@ export class VillageHud {
           btn.type = "button";
           const done = plan.level >= u.levels.length;
           btn.append(el("span", "levy-name", done ? `${u.label}: nivel máximo` : `Forjar ${u.label.toLowerCase()} · nivel ${plan.level + 1}`),
-            el("span", "levy-cost", done ? `Nivel ${plan.level} (${u.effect} por nivel)` : `${plan.wood} madera · ${plan.coins} monedas · ${plan.days} días · ${u.effect}`));
+            el("span", "levy-cost", done ? `Nivel ${plan.level} (${u.effect} por nivel)` : `${costLine(plan.cost)} · ${plan.days} días · ${u.effect}`));
           btn.disabled = !plan.ok;
           if (!plan.ok && !done) btn.append(el("span", "levy-why", plan.reason));
           btn.onclick = () => { v.startForge(kind); this.invalidate(); };
@@ -254,6 +283,23 @@ export class VillageHud {
         items.push(el("div", "p-row", `+${t.storage} de capacidad para cada recurso`));
       } else if (t.kind === "house") {
         items.push(el("div", "p-row", b.residents.length ? `Vive la familia ${b.residents[0].name}` : "Vacía: llegará una familia si la aprobación es de 50% o más"));
+        if (b.extra) {
+          const x = HOUSE_EXTRAS[b.extra];
+          const away = b.residents[0]?.levied !== null && b.residents.length > 0;
+          items.push(el("p", away || !b.residents.length ? "p-note neg" : "p-note", `${x.label}: ${x.description}.${away ? " Parado: la familia está en la leva." : !b.residents.length ? " Parado: no vive nadie." : ""}`));
+        } else if (b.residents.length) {
+          items.push(el("p", "p-note", `Mejora de la casa: la trabaja la propia familia sin dejar su oficio. Hace falta ${EXTRA_MIN_APPROVAL}% de aprobación. Cada casa mejorada suma 1 de aprobación (hasta 6).`));
+          for (const kind of ["garden", "workshop"] as HouseExtra[]) {
+            const x = HOUSE_EXTRAS[kind], plan = v.extraPlan(b, kind);
+            const btn = el("button", "levy-btn");
+            btn.type = "button";
+            btn.append(el("span", "levy-name", `Poner ${x.label.toLowerCase()}`), el("span", "levy-cost", `${costLine(x.cost)} · ${x.description}`));
+            btn.disabled = !plan.ok;
+            if (!plan.ok) btn.append(el("span", "levy-why", plan.reason));
+            btn.onclick = () => { v.upgradeHouse(b, kind); this.invalidate(); };
+            items.push(btn);
+          }
+        }
       } else if (levyKinds.length) {
         items.push(el("div", "p-row", t.kind === "stable"
           ? "Jinetes: cada familia aporta 2 hombres a caballo. Cargan con fuerza por el flanco o la espalda, pero contra lanzas firmes salen mal parados. Cada caballo en servicio come 0,25 de grano al día."
