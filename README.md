@@ -12,7 +12,7 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Sonido:** todo sintetizado en tiempo real (sin archivos): choques de armas, flechas, cargas, cuerno de alarma, campanas, martillos, viento, pájaros y grillos, música de laúd y tambores en las incursiones. Suena tras el primer clic.
 - **Compartir:** el juego es un único archivo (`dist/index.html`); también hay una versión jugable con enlace en claude.ai.
 
-## Novedades 0.7 · fase 5 (defensa), en curso
+## Novedades 0.8 · fase 5 (defensa)
 - **Empalizada y puertas**: en la barra de construcción, clic en el inicio y clic en el final (la empalizada sigue encadenando tramos de 4 m, 1 madera cada uno; la puerta mide 5 m y cuesta 3). Las construyen las familias sin trabajo.
 - Los aldeanos y tus tropas cruzan las puertas; los bandidos no. Si no tienen otro camino, eligen un tramo y lo derriban a hachazos (unos 30 s una banda de 20); la brecha se abre en la navegación y siguen hacia la aldea.
 - Clic en un tramo: resistencia y demoler. Los tramos se guardan con la partida.
