@@ -12,6 +12,16 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Sonido:** todo sintetizado en tiempo real (sin archivos): choques de armas, flechas, cargas, cuerno de alarma, campanas, martillos, viento, pájaros y grillos, música de laúd y tambores en las incursiones. Suena tras el primer clic.
 - **Compartir:** el juego es un único archivo (`dist/index.html`); también hay una versión jugable con enlace en claude.ai.
 
+## Novedades 0.10 · fase 7 (el mundo)
+- **Mapa de 720 m** (antes 400) con **diez tierras** de bordes irregulares, lindes pintadas en el suelo y un estandarte en cada una. El río las separa del este; se cruza por dos vados.
+- **Mapa del señorío** (tecla **N** o botón «Mapa»): tierras por dueño, edificios, tropas y cámara. Clic en una tierra: rasgos, reclamar, ir allí (doble clic también lleva la cámara).
+- **Solo se construye en tierras propias.** Las libres que lindan con las tuyas se **reclaman** con monedas (25, y 15 más por cada una); cada una paga **0,4 monedas al día** de tributo. Rasgos: Vega del Río (granjas +40%), Prados del Sur (+25%), Bosque Negro (leñadores +35%)…
+- **El señor de Montfort**: castro al este con torre del homenaje, casas y una guarnición (lanceros, arqueros, mesnada) que defiende su puesto y se rehace cada 12 días. Reclama una tierra libre cada 16 días desde el día 20.
+  - Tras las tres bandas de bandidos, las incursiones son **huestes de Montfort** (lanceros, ballesteros, peones y caballeros), mayores cada vez y más cuantas más tierras tenga.
+  - Le quitas una tierra **ocupando su estandarte** 15 s sin enemigos a 45 m; su **castro**, 30 s. Si cae el castro, se rinde: sus tierras son tuyas y **ganas la partida** (luego, modo libre).
+- **Objetivos de campaña** tras los primeros pasos: reclamar una tierra, resistir a los bandidos, quitarle una tierra a Montfort y rendir su castro.
+- Las partidas guardadas de antes se cargan (en el mapa nuevo; los árboles talados no se conservan).
+
 ## Novedades 0.9 · fase 6 (economía)
 - **Aserradero** (8 madera, 5 monedas, 2 aserradores): cada uno sierra 3 de madera al día en 2 **tablones**, sin bajar de 15 de madera (leña y obras).
   - Piden tablones: el **establo** (6 madera, 8 tablones, 25 monedas), las armas y armaduras de **nivel 2** en la herrería y el **taller** de las casas.

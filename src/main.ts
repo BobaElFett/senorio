@@ -23,6 +23,7 @@ import { Objectives } from "./ui/objectives";
 import { Regions } from "./world/regions";
 import { RegionsView } from "./world/regionsView";
 import { MapPanel } from "./ui/mapPanel";
+import { Rival } from "./campaign/rival";
 
 type Mode = "village" | "battle";
 
@@ -69,6 +70,10 @@ const villageView = new VillageView(scene, terrain);
 // Partida: aldea y combate en el mismo mapa
 const battle = new Battle(terrain, nav);
 const campaign = new Campaign(village, battle);
+const rival = new Rival(village, battle, regions, terrain, nav);
+scene.add(rival.group);
+campaign.rival = rival;
+rival.onDefeat = () => campaign.rivalDefeated();
 const battleView = new BattleView(scene, terrain);
 const controls = new Controls(renderer.domElement, rts, terrain, battle, battleView);
 const vControls = new VillageControls(renderer.domElement, rts, village, villageView,
@@ -125,6 +130,7 @@ function beginNew(difficulty: Difficulty = "normal") {
   if (mode !== "village") { mode = "battle"; inGame = true; setMode("village"); inGame = false; }
   campaign.difficulty = difficulty;
   village.setup();
+  rival.setup();
   if (difficulty !== "normal") village.event(`Dificultad: ${DIFFICULTY[difficulty].label.toLowerCase()}`, "info");
   inGame = true;
   rts.setView(4, 30, 0.5, 105);
@@ -215,6 +221,7 @@ function setMode(m: Mode) {
   }
   battleView.setVisible(m === "village");
   regionsView.group.visible = m === "village";
+  rival.group.visible = m === "village";
   if (m !== "village") mapPanel.close();
   testView.setVisible(m === "battle");
   const v = views[m];
@@ -402,4 +409,4 @@ renderer.setAnimationLoop(() => {
 });
 
 // Acceso de depuración desde la consola del navegador
-(window as any).game = { regions, mapPanel, scene, terrain, rts, renderer, battle, controls, nav, village, vControls, forest, setMode, campaign, testBattle, testControls, menu, audio, saveNow, beginNew, beginFromSave, particles };
+(window as any).game = { rival, regions, mapPanel, scene, terrain, rts, renderer, battle, controls, nav, village, vControls, forest, setMode, campaign, testBattle, testControls, menu, audio, saveNow, beginNew, beginFromSave, particles };

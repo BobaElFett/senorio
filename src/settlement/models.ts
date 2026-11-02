@@ -310,6 +310,24 @@ export function houseExtraModel(kind: "garden" | "workshop"): THREE.Group {
   return g;
 }
 
+/** Torre del homenaje del señor rival: piedra, almenas y estandarte rojo. */
+export function keepModel(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(9, 11, 9, C.stone));
+  for (let i = 0; i < 4; i++) for (let k = -1; k <= 1; k++) {
+    const side = i * Math.PI / 2;
+    const bx = Math.sin(side) * 4.3 + Math.cos(side) * k * 3, bz = Math.cos(side) * 4.3 - Math.sin(side) * k * 3;
+    g.add(box(1.4, 1.3, 1.4, C.stone, bx, 11, bz));
+  }
+  g.add(box(1.8, 3, 0.2, C.door, 0, 0, 4.55));
+  for (const [x, y] of [[-2.4, 6], [2.4, 6], [0, 8.5]]) g.add(box(0.6, 1.1, 0.12, C.darkWood, x, y, 4.55));
+  g.add(box(0.14, 6, 0.14, C.timber, 0, 11, 0));
+  const flag = box(2.6, 1.6, 0.06, "#a8302a", 1.35, 0, 0); flag.position.y = 15.6; g.add(flag);
+  g.add(box(10.4, 0.5, 10.4, "#7c786d", 0, 0, 0));
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return g;
+}
+
 export function buildingModel(kind: BuildingKind): THREE.Group {
   const g = BUILDERS[kind]();
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });

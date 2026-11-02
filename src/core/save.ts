@@ -2,7 +2,7 @@ import { Region } from "../world/regions";
 import { Village, Building, Family } from "../settlement/village";
 import { Forest } from "../world/forest";
 import { Campaign, Phase } from "../campaign/campaign";
-import { Battle, Team, RegState } from "../combat/battle";
+import { Battle, Team, RegState, Regiment } from "../combat/battle";
 import { BuildingKind } from "../data/buildings";
 import { UnitKind } from "../data/units";
 
@@ -13,7 +13,7 @@ const VERSION = 2;   // 2: mapa de 720 m con tierras
 
 interface SavedRegiment {
   id: number; team: Team; name: string; kind: UnitKind; x: number; z: number; facing: number; files: number;
-  size: number; morale: number; state: RegState; plundering: boolean; withdrawing: boolean;
+  size: number; morale: number; state: RegState; plundering: boolean; withdrawing: boolean; guard?: Regiment["guard"];
   soldiers: { x: number; z: number; hp: number; heading: number; family: number }[];
 }
 
@@ -30,6 +30,7 @@ export interface SaveData {
   };
   felled: number[];
   regions?: (string | null)[];
+  rival?: { alive: boolean; nextClaim: number; nextReinforce: number; taken?: number };
   walls?: { ax: number; az: number; bx: number; bz: number; gate: boolean; built: boolean; progress: number; hp: number }[];
   campaign: { raidIndex: number; phase: Phase; results: Campaign["results"]; plunderTime: number; withdrawTime: number; levyCount: Record<string, number>; difficulty?: Campaign["difficulty"]; endless?: boolean; endlessShift?: number };
   regiments: SavedRegiment[];
@@ -59,11 +60,12 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
     },
     felled: forest.trees.flatMap((t, i) => (t.alive ? [] : [i])),
     regions: v.regions ? v.regions.list.map((r) => r.owner) : undefined,
+    rival: c.rival ? c.rival.serialize() : undefined,
     walls: v.walls.map((w) => ({ ax: w.ax, az: w.az, bx: w.bx, bz: w.bz, gate: w.gate, built: w.built, progress: w.progress, hp: w.hp })),
     campaign: { raidIndex: c.raidIndex, phase: c.phase, results: [...c.results], plunderTime: c.plunderTime, withdrawTime: c.withdrawTime, levyCount: { ...cc.levyCount }, difficulty: c.difficulty, endless: c.endless, endlessShift: c.endlessShift },
     regiments: b.regiments.filter((r) => r.state !== "gone" && r.alive.length).map((r) => ({
       id: r.id, team: r.team, name: r.name, kind: r.type.kind, x: r.x, z: r.z, facing: r.facing, files: r.files,
-      size: r.size, morale: r.morale, state: r.state, plundering: r.plundering, withdrawing: r.withdrawing,
+      size: r.size, morale: r.morale, state: r.state, plundering: r.plundering, withdrawing: r.withdrawing, guard: r.guard,
       soldiers: r.alive.map((s) => ({ x: s.x, z: s.z, hp: s.hp, heading: s.heading, family: s.family })),
     })),
   };
@@ -119,7 +121,7 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
     const r = b.spawn(s.team, s.name, s.kind, s.x, s.z, s.facing, s.soldiers.length, (i) => s.soldiers[i].family);
     remap.set(s.id, r.id);
     r.files = s.files; r.size = s.size; r.morale = s.morale; r.state = s.state;
-    r.plundering = s.plundering; r.withdrawing = s.withdrawing;
+    r.plundering = s.plundering; r.withdrawing = s.withdrawing; r.guard = s.guard ?? null;
     r.alive.forEach((sol, i) => {
       const o = s.soldiers[i];
       sol.x = o.x; sol.z = o.z; sol.hp = o.hp; sol.heading = o.heading;
@@ -137,7 +139,12 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
   c.difficulty = d.campaign.difficulty ?? "normal";
   c.endless = !!d.campaign.endless;
   c.endlessShift = d.campaign.endlessShift ?? 0;
-  c.raiders = b.regiments.filter((r) => r.team === 1);
+  c.raiders = b.regiments.filter((r) => r.team === 1 && !r.guard);
+  if (c.rival) {
+    if (d.rival) c.rival.restore(d.rival);
+    else c.rival.setup();     // partida de antes de Montfort: aparece su guarnición
+    c.rival.garrison = b.regiments.filter((r) => r.team === 1 && !!r.guard);
+  }
   v.event("Partida cargada", "info");
 }
 

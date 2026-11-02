@@ -136,11 +136,18 @@ export class Hud {
       const d = c.el.querySelector<HTMLButtonElement>(".disband");
       if (d) { d.disabled = r.engaged || !r.active; d.title = r.engaged ? "No se puede licenciar en pleno combate" : "Los supervivientes vuelven a casa y a trabajar"; }
     }
-    for (const [r, c] of this.enemies) fill(r, c);
+    // La guarnición de Montfort solo aparece cuando está en acción
+    let shown = 0;
+    for (const [r, c] of this.enemies) {
+      fill(r, c);
+      const hide = !!r.guard && r.order.kind !== "attack" && !r.engaged;
+      c.el.hidden = hide;
+      if (!hide) shown++;
+    }
 
     const b = this.battle;
     this.bar.hidden = this.cards.size === 0;
-    this.enemyList.hidden = this.enemies.size === 0;
+    this.enemyList.hidden = shown === 0;
     if (this.campaign) {
       const info = this.campaign.banner();
       this.banner.hidden = !info;

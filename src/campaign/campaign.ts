@@ -2,6 +2,8 @@ import { Village, LevyKind, LEVY, isLevyKind } from "../settlement/village";
 import { Battle, Regiment } from "../combat/battle";
 import { UnitKind } from "../data/units";
 import { P } from "../world/navgrid";
+import { Rival } from "./rival";
+import { RIVAL_SEAT } from "../world/terrain";
 import { DAY_SECONDS, TOWER_RANGE, TOWER_RELOAD, TOWER_DAMAGE } from "../data/buildings";
 
 /**
@@ -14,13 +16,16 @@ import { DAY_SECONDS, TOWER_RANGE, TOWER_RELOAD, TOWER_DAMAGE } from "../data/bu
 
 /** Cada grupo puede llegar por su lado (`from`); si no, por el de la incursión. */
 type RaidUnit = [UnitKind, number, string, P?];
-interface RaidSpec { day: number; name: string; from: P; units: RaidUnit[] }
+interface RaidSpec { day: number; name: string; from: P; units: RaidUnit[]; lord?: boolean }
 
 // Entradas al mapa (−x es el oeste, −z el norte)
 const ENTRY = {
   oeste: { x: -175, z: 10 }, noroeste: { x: -120, z: -125 }, norte: { x: -40, z: -170 },
   suroeste: { x: -115, z: 130 }, sur: { x: -10, z: 170 }, este: { x: 168, z: 20 },
 };
+
+/** Primera letra en minúscula (respeta nombres propios como Montfort). */
+const lc = (t: string) => t[0].toLowerCase() + t.slice(1);
 
 /** «al oeste», «al norte»... según de dónde llegan. */
 export function sideName(p: P): string {
@@ -59,7 +64,9 @@ export class Campaign {
   results: ("victoria" | "saqueo")[] = [];
   private levyCount: Record<LevyKind, number> = { spear: 0, archer: 0, cavalry: 0 };
   difficulty: Difficulty = "normal";
-  endless = false;              // tras las tres incursiones, seguir con ataques cada vez mayores
+  endless = false;
+  /** El señor rival: tras las tres bandas de bandidos, las incursiones son huestes suyas. */
+  rival: Rival | null = null;              // tras las tres incursiones, seguir con ataques cada vez mayores
   private lastFamilies = 0;
 
   constructor(public village: Village, public battle: Battle) {
@@ -72,6 +79,17 @@ export class Campaign {
   raidAt(i: number): RaidSpec | null {
     const d = DIFFICULTY[this.difficulty];
     let base: RaidSpec | undefined = RAIDS[i];
+    if (!base && this.rival?.alive) {
+      // Hueste de Montfort: cada vez mayor, y más cuantas más tierras tiene
+      const k = i - RAIDS.length + 1, m = 1 + 0.15 * Math.max(0, this.rival.strength - 2);
+      const n = (x: number) => Math.round(x * m);
+      const from = { x: RIVAL_SEAT.x - 45, z: RIVAL_SEAT.z };
+      base = {
+        day: RAIDS[RAIDS.length - 1].day + 22 * k, name: k === 1 ? "La hueste de Montfort" : `La ${k}.ª hueste de Montfort`, from, lord: true,
+        units: [["spear", n(24 + 6 * k), "Lanceros de Montfort"], ["archer", n(14 + 3 * k), "Ballesteros de Montfort"],
+          ["militia", n(18 + 4 * k), "Peones de Montfort"], ["cavalry", n(8 + 2 * k), "Caballeros de Montfort"]],
+      };
+    }
     if (!base) {
       if (!this.endless) return null;
       const k = i - RAIDS.length + 1;
@@ -91,9 +109,14 @@ export class Campaign {
   }
   get raid(): RaidSpec | null {
     const r = this.raidAt(this.raidIndex);
-    return r && this.raidIndex >= RAIDS.length ? { ...r, day: r.day + this.endlessShift } : r;
+    return r && this.raidIndex >= RAIDS.length && !r.lord ? { ...r, day: r.day + this.endlessShift } : r;
   }
   get totalRaids() { return RAIDS.length; }
+
+  /** El castro ha caído: si no hay incursión en marcha, la partida está ganada. */
+  rivalDefeated() {
+    if (this.phase === "calm" || this.phase === "warning") { this.phase = "won"; }
+  }
 
   /** Seguir jugando tras ganar: incursiones sin fin. */
   continueEndless() {
@@ -140,19 +163,27 @@ export class Campaign {
     if (this.phase === "won") {
       const wins = this.results.filter((x) => x === "victoria").length;
       const more = { label: "Seguir jugando (modo libre)", run: () => this.continueEndless() };
+      if (this.rival && !this.rival.alive)
+        return { text: `¡Montfort se ha rendido! Eres el señor de toda la comarca.${this.results.length ? ` Rechazaste ${wins} de ${this.results.length} incursiones.` : ""}`, kind: "good", action: more };
       if (wins === RAIDS.length) return { text: `¡Has defendido el señorío! Rechazaste las ${RAIDS.length} incursiones.`, kind: "good", action: more };
       if (wins === 0) return { text: `La aldea sobrevive, pero los bandidos la saquearon las ${RAIDS.length} veces.`, kind: "bad", action: more };
       return { text: `La aldea resiste: rechazaste ${wins} de ${RAIDS.length} incursiones.`, kind: "warn", action: more };
     }
     if (this.phase === "lost") return { text: "La aldea ha quedado desierta. Fin de la partida.", kind: "bad" };
+    const cap = this.rival?.capturing;
+    if (cap && (this.phase === "calm" || this.phase === "warning")) {
+      return { text: `Ocupando el estandarte de ${cap.region.name}: ${Math.floor(cap.p * 100)}%. Que no se acerque ningún enemigo.`, kind: "warn" };
+    }
     if (!r) return null;
     if (this.phase === "warning") {
       const left = Math.max(0, r.day - v.day);
-      return { text: `Bandidos ${this.sides(r)} (${r.name.toLowerCase()}): llegan en ${left < 1 ? Math.ceil(left * 24) + " horas" : Math.ceil(left) + " días"}. Recluta en el cuartel.`, kind: "warn" };
+      const when = left < 1 ? Math.ceil(left * 24) + " horas" : Math.ceil(left) + " días";
+      return { text: r.lord ? `${r.name}, ${this.from(r)}: llega en ${when}. Recluta y prepara la defensa.` : `Bandidos ${this.sides(r)} (${lc(r.name)}): llegan en ${when}. Recluta en el cuartel.`, kind: "warn" };
     }
-    if (this.phase === "raid") return { text: `Incursión ${this.raidIndex + 1}${this.endless ? "" : "/" + RAIDS.length}: ${r.name}. Sal a su encuentro antes de que lleguen a la aldea.`, kind: "raid" };
-    if (this.phase === "plunder") return { text: `¡Saqueo! Los bandidos se llevan las provisiones y nadie trabaja.`, kind: "bad" };
-    if (this.phase === "withdraw") return { text: `Los bandidos se retiran con el botín.`, kind: "bad" };
+    if (this.phase === "raid") return { text: `Incursión ${this.raidIndex + 1}${this.raidIndex < RAIDS.length ? "/" + RAIDS.length : ""}: ${r.name}. Sal a su encuentro antes de que lleguen a la aldea.`, kind: "raid" };
+    const who = r.lord ? "los de Montfort" : "los bandidos";
+    if (this.phase === "plunder") return { text: `¡Saqueo! ${who[0].toUpperCase() + who.slice(1)} se llevan las provisiones y nadie trabaja.`, kind: "bad" };
+    if (this.phase === "withdraw") return { text: `${who[0].toUpperCase() + who.slice(1)} se retiran con el botín.`, kind: "bad" };
     return null;
   }
 
@@ -191,6 +222,7 @@ export class Campaign {
     const v = this.village, b = this.battle;
     if (this.phase === "won" || this.phase === "lost") return;
     const dd = dt / DAY_SECONDS;
+    this.rival?.update(dt);
     const store = v.buildings.find((x) => x.type.kind === "storehouse");
     b.raidTarget = store ? store.door : { x: 0, z: 0 };
 
@@ -208,7 +240,8 @@ export class Campaign {
     const lead = WARNING_DAYS + (this.watchTowers.length ? 1 : 0);
     if (this.phase === "calm" && r && v.day >= r.day - lead) {
       this.phase = "warning";
-      v.event(`¡Bandidos ${this.sides(r)}! Llegan en ${lead} días: ${r.name.toLowerCase()}${lead > WARNING_DAYS ? " (los ha avistado la torre)" : ""}`, "bad");
+      const tower = lead > WARNING_DAYS ? " (la ha avistado la torre)" : "";
+      v.event(r.lord ? `¡${r.name} se acerca ${this.from(r)}! Llega en ${lead} días${tower}` : `¡Bandidos ${this.sides(r)}! Llegan en ${lead} días: ${lc(r.name)}${tower}`, "bad");
     }
     this.updateTowers(dt);
     if (this.phase === "warning" && r && v.day >= r.day) this.startRaid(r);
@@ -218,7 +251,7 @@ export class Campaign {
       if (!alive.length) { this.endRaid(true); return; }
       const plundering = alive.some((x) => x.plundering);
       if (plundering) {
-        if (this.phase !== "plunder") { this.phase = "plunder"; v.event("Los bandidos han entrado en la aldea y saquean", "bad"); }
+        if (this.phase !== "plunder") { this.phase = "plunder"; v.event(r?.lord ? "Los de Montfort han entrado en la aldea y saquean" : "Los bandidos han entrado en la aldea y saquean", "bad"); }
         v.underAttack = true;
         this.plunderTime += dd;
         // Se llevan un 30% de lo almacenado por día de saqueo
@@ -271,7 +304,8 @@ export class Campaign {
         this.raiders.push(this.battle.spawn(1, name, kind, x, z, facing, n));
       });
     }
-    this.village.event(`Han llegado ${this.raiders.reduce((s, x) => s + x.count, 0)} bandidos ${this.sides(r)}: ${r.name.toLowerCase()}`, "bad");
+    const men = this.raiders.reduce((s, x) => s + x.count, 0);
+    this.village.event(r.lord ? `${r.name}: ${men} hombres en marcha ${this.sides(r)}` : `Han llegado ${men} bandidos ${this.sides(r)}: ${lc(r.name)}`, "bad");
   }
 
   /** Entradas distintas por las que llega una incursión. */
@@ -285,6 +319,8 @@ export class Campaign {
     const names = [...new Set(this.entries(r).map(sideName))];
     return names.length > 1 ? names.slice(0, -1).join(", ") + " y " + names[names.length - 1] : names[0];
   }
+  /** «desde el este y el norte». */
+  from(r: RaidSpec): string { return this.sides(r).replace(/\bal /g, "el ").replace(/^el /, "desde el "); }
   /** Entrada de la incursión más cercana a un regimiento (por donde se retira). */
   private homeOf(r: RaidSpec, x: Regiment): P {
     let best = r.from, bd = Infinity;
@@ -316,6 +352,13 @@ export class Campaign {
   private nextRaid() {
     this.raiders = [];
     this.raidIndex++;
+    if (this.rival) {
+      // Con señor rival, la partida se gana tomando su castro
+      this.phase = !this.rival.alive && !this.endless ? "won" : "calm";
+      if (this.raidIndex === RAIDS.length && this.rival.alive)
+        this.village.event("Se acabaron las bandas de bandidos. Ahora el peligro es Montfort: toma su castro para ganar", "info");
+      return;
+    }
     this.phase = this.raidIndex >= RAIDS.length && !this.endless ? "won" : "calm";
     if (this.phase === "won") this.village.event("Has sobrevivido a las tres incursiones", "good");
     else if (this.endless) this.village.event(`Incursión ${this.raidIndex} superada. La próxima será mayor.`, "info");

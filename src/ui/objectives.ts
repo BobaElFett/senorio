@@ -33,6 +33,23 @@ const LIST: Objective[] = [
     done: (v) => v.season === 3 && v.foodTotal >= 60 || v.year >= 2 },
 ];
 
+// Segunda etapa: la campaña contra el señor de Montfort
+const CAMPAIGN: Objective[] = [
+  { id: "claim", title: "Reclama una tierra",
+    hint: "Abre el mapa (N): las tierras que lindan con las tuyas se compran con monedas y pagan tributo. La Vega del Río es la más fértil, y Montfort también la quiere.",
+    done: (v) => !!v.regions && v.regions.count("player") >= 2 },
+  { id: "bandits", title: "Resiste las tres bandas de bandidos",
+    hint: "Después de la tercera, las incursiones serán huestes de Montfort: cada vez mayores, y más cuantas más tierras tenga él.",
+    done: (_v, c) => c.raidIndex >= 3 || (!!c.rival && !c.rival.alive) },
+  { id: "take", title: "Quita una tierra a Montfort",
+    hint: "Lleva tropas a su estandarte y aguanta 15 s sin enemigos a 45 m. Sus tierras están al este del río: se cruza por los vados del norte y del sur.",
+    done: (_v, c) => !!c.rival && (c.rival.taken > 0 || !c.rival.alive) },
+  { id: "capital", title: "Rinde el Castro de Montfort",
+    hint: "Lo defienden lanceros, arqueros y una mesnada. Mejora las armas en la herrería, ataca con varios regimientos y aguanta 30 s junto a su estandarte.",
+    done: (_v, c) => !!c.rival && !c.rival.alive },
+];
+const STAGES = [{ title: "Primeros pasos", list: LIST }, { title: "Campaña: el señorío", list: CAMPAIGN }];
+
 export class Objectives {
   done = new Set<string>();
   collapsed = false;
@@ -40,6 +57,7 @@ export class Objectives {
   private list = document.getElementById("obj-list")!;
   private hint = document.getElementById("obj-hint")!;
   private toggle = document.getElementById("obj-toggle") as HTMLButtonElement;
+  private title = document.getElementById("obj-title")!;
   private key = "";
   private acc = 1;
 
@@ -47,7 +65,9 @@ export class Objectives {
     this.toggle.onclick = () => { this.collapsed = !this.collapsed; this.key = ""; this.render(); this.toggle.blur(); };
   }
 
-  get finished() { return LIST.every((o) => this.done.has(o.id)); }
+  /** Etapa en curso: los primeros pasos y, al acabarlos, la campaña. */
+  private get stage() { return STAGES.find((s) => s.list.some((o) => !this.done.has(o.id))) ?? null; }
+  get finished() { return !this.stage; }
 
   update(dt: number, visible: boolean) {
     this.root.hidden = !visible || this.finished;
@@ -56,7 +76,7 @@ export class Objectives {
     if (this.acc < 0.5) return;
     this.acc = 0;
     // Se cumplen en orden: así el consejo siempre apunta al siguiente paso
-    for (const o of LIST) {
+    for (const o of this.stage?.list ?? []) {
       if (this.done.has(o.id)) continue;
       if (o.done(this.v, this.c, this.b)) { this.done.add(o.id); this.onComplete(o.title); }
       break;
@@ -65,7 +85,11 @@ export class Objectives {
   }
 
   private render() {
+    const stage = this.stage;
+    if (!stage) return;
+    const LIST = stage.list;
     const current = LIST.find((o) => !this.done.has(o.id));
+    this.title.textContent = stage.title;
     const key = `${[...this.done].join()}|${this.collapsed}`;
     if (key === this.key) return;
     this.key = key;

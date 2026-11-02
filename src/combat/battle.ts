@@ -71,6 +71,7 @@ export class Regiment {
   withdrawing = false;          // bandidos retirándose con el botín
   breach: WallRef | null = null; // tramo de empalizada que están derribando
   flank: P | null = null;        // punto de rodeo para atacar por el flanco (IA)
+  guard: { x: number; z: number; r: number; facing: number } | null = null; // guarnición: defiende su puesto
   size: number;                 // efectivos al formarse
 
   constructor(
@@ -667,6 +668,7 @@ export class Battle {
   private runAI() {
     for (const r of this.regiments) {
       if (r.team !== 1 || !r.active || r.withdrawing) continue;
+      if (r.guard) { this.guardAI(r, r.guard); continue; }
       let best: Regiment | null = null, bd = Infinity;
       for (const o of this.regiments) {
         if (o.team !== 0 || !o.active) continue;
@@ -737,6 +739,20 @@ export class Battle {
       r.flank = null;
       if (r.order.kind !== "attack" || r.order.target !== best) this.orderAttack(r, best);
     }
+  }
+
+  /** Guarnición: ataca a quien entre en su radio y, si no hay nadie, vuelve a su puesto. */
+  private guardAI(r: Regiment, g: { x: number; z: number; r: number; facing: number }) {
+    let tgt: Regiment | null = null, td = Infinity;
+    for (const o of this.regiments) {
+      if (o.team !== 0 || !o.active) continue;
+      if (Math.hypot(o.cx - g.x, o.cz - g.z) > g.r) continue;
+      const d = Math.hypot(o.cx - r.cx, o.cz - r.cz);
+      if (d < td) { td = d; tgt = o; }
+    }
+    if (tgt) { if (r.order.kind !== "attack" || r.order.target !== tgt) this.orderAttack(r, tgt); return; }
+    if (r.order.kind === "attack") this.orderHalt(r);
+    if (Math.hypot(r.x - g.x, r.z - g.z) > 10 && (r.order.kind !== "move" || !r.path.length)) this.orderMove(r, g.x, g.z, g.facing, null);
   }
 
   /** Punto a un costado y algo por detrás del regimiento `t`, del lado por el que llega `r`. */
