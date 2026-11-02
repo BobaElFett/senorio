@@ -1,6 +1,6 @@
 // Tipos de edificio de la aldea. Costes, tamaños y producción viven aquí.
 
-export type BuildingKind = "house" | "woodcutter" | "farm" | "storehouse" | "market" | "barracks" | "mill" | "bakery" | "tower" | "stable";
+export type BuildingKind = "house" | "woodcutter" | "farm" | "storehouse" | "market" | "barracks" | "mill" | "bakery" | "tower" | "stable" | "smithy";
 export type Resource = "wood" | "food" | "coins" | "flour" | "bread";
 export const RESOURCES: Resource[] = ["wood", "food", "coins", "flour", "bread"];
 
@@ -54,13 +54,17 @@ export const BUILDINGS: Record<BuildingKind, BuildingType> = {
     kind: "barracks", label: "Cuartel", description: "Recluta lanceros y arqueros entre las familias de la aldea.",
     cost: { wood: 10, coins: 30 }, buildDays: 4, w: 12, d: 10, workers: 0, housing: 0, storage: 0,
   },
+  smithy: {
+    kind: "smithy", label: "Herrería", description: "Con un herrero, forja mejores armas y armaduras para tus regimientos.",
+    cost: { wood: 10, coins: 20 }, buildDays: 3, w: 8, d: 7, workers: 1, housing: 0, storage: 0,
+  },
   stable: {
     kind: "stable", label: "Establo", description: "Cría caballos y forma jinetes: dos por familia. Los caballos comen grano.",
     cost: { wood: 14, coins: 25 }, buildDays: 4, w: 12, d: 8, workers: 0, housing: 0, storage: 0,
   },
 };
 
-export const BUILD_ORDER: BuildingKind[] = ["house", "woodcutter", "farm", "mill", "bakery", "storehouse", "market", "barracks", "tower", "stable"];
+export const BUILD_ORDER: BuildingKind[] = ["house", "woodcutter", "farm", "mill", "bakery", "storehouse", "market", "barracks", "smithy", "tower", "stable"];
 
 export const RESOURCE_LABEL: Record<Resource, string> = { wood: "Madera", food: "Grano", coins: "Monedas", flour: "Harina", bread: "Pan" };
 
@@ -81,4 +85,10 @@ export const BREAD_PER_FLOUR = 5 / 3;
 export const TOWER_RANGE = 70;        // m
 export const TOWER_RELOAD = 1.6;      // s entre flechas
 export const TOWER_DAMAGE = 5;
+/** Mejoras de la herrería: dos niveles de armas y dos de armaduras. */
+export type Upgrade = "arms" | "armor";
+export const UPGRADES: Record<Upgrade, { label: string; effect: string; levels: { wood: number; coins: number; days: number }[] }> = {
+  arms: { label: "Armas", effect: "+1 de ataque y flechas más dañinas", levels: [{ wood: 10, coins: 20, days: 4 }, { wood: 15, coins: 35, days: 6 }] },
+  armor: { label: "Armaduras", effect: "+1 de defensa y +1,5 de vida", levels: [{ wood: 12, coins: 25, days: 4 }, { wood: 18, coins: 40, days: 6 }] },
+};
 export const HORSE_FOOD = 0.25;      // grano por caballo y día (jinetes en servicio)

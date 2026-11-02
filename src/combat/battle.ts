@@ -125,6 +125,10 @@ export class Battle {
   onWallHit: ((id: number, dmg: number) => boolean) | null = null;
   /** Avisos para el sonido: golpe, disparo, impacto de flecha, carga, huida. */
   onEvent: ((kind: "strike" | "fire" | "hit" | "charge" | "rout", x: number, z: number) => void) | null = null;
+  /** Mejoras por bando (herrería): se suman a los números del tipo de tropa. */
+  bonus: { attack: number; defense: number; hp: number; arrow: number }[] = [
+    { attack: 0, defense: 0, hp: 0, arrow: 0 }, { attack: 0, defense: 0, hp: 0, arrow: 0 },
+  ];
   private nextReg = 0;
   private hash = new Map<number, Soldier[]>();
   private aiTimer = 0;
@@ -164,7 +168,7 @@ export class Battle {
       const p = this.nav.nearestOpen(slot.x, slot.z, team === 1);
       const s: Soldier = {
         id: this.nextId++, reg: r, x: p.x, z: p.z, y: this.terrain.heightAt(p.x, p.z),
-        vx: 0, vz: 0, heading: facing, hp: type.hp, alive: true, fled: false, slot: i,
+        vx: 0, vz: 0, heading: facing, hp: type.hp + this.bonus[team].hp, alive: true, fled: false, slot: i,
         target: null, seek: Math.random() * 0.3, cooldown: Math.random(), attackAnim: 0,
         reload: Math.random() * type.reload, bob: Math.random() * 10, family: familyOf ? familyOf(i) : 0,
         route: [], routeT: Math.random(),
@@ -517,7 +521,7 @@ export class Battle {
       } else dr.morale -= 10 * ar.type.charge;
       this.onEvent?.("charge", d.x, d.z);
     }
-    let hit = 0.5 + (ar.type.attack - dr.type.defense) * 0.06;
+    let hit = 0.5 + (ar.type.attack + this.bonus[ar.team].attack - dr.type.defense - this.bonus[dr.team].defense) * 0.06;
     if (flank) hit += 0.15;
     if (rear) hit += 0.25;
     if (ar.state === "wavering") hit -= 0.1;
@@ -590,7 +594,7 @@ export class Battle {
       this.arrows.push({
         x: s.x, y: sy, z: s.z,
         vx: (tx - s.x) / T, vz: (tz - s.z) / T, vy: (ty - sy + 0.5 * GRAVITY * T * T) / T,
-        t: 0, T, team: r.team, dmg: r.type.arrowDamage, landed: -1,
+        t: 0, T, team: r.team, dmg: r.type.arrowDamage + this.bonus[r.team].arrow, landed: -1,
       });
       s.attackAnim = 0.6;
       this.onEvent?.("fire", s.x, s.z);
@@ -630,7 +634,7 @@ export class Battle {
           const v = hit.s;
           this.onEvent?.("hit", v.x, v.z);
           v.reg.morale -= 0.25;
-          if (Math.random() < 0.8 - v.reg.type.defense * 0.08) this.damage(v, a.dmg * (0.8 + Math.random() * 0.4));
+          if (Math.random() < 0.8 - (v.reg.type.defense + this.bonus[v.reg.team].defense) * 0.08) this.damage(v, a.dmg * (0.8 + Math.random() * 0.4));
           this.arrows.splice(i, 1);
         }
       }

@@ -298,6 +298,14 @@ function villageEffects(dt: number) {
       const top = Math.max(terrain.heightAt(h.rect.minX, h.rect.minZ), terrain.heightAt(h.rect.maxX, h.rect.maxZ), terrain.heightAt(h.rect.minX, h.rect.maxZ), terrain.heightAt(h.rect.maxX, h.rect.minZ));
       particles.chimney(x, top + 5.3, z);
     }
+    // La herrería echa humo mientras forja
+    for (const h of village.buildings) {
+      if (h.type.kind !== "smithy" || !h.built || !h.workers.length || !village.forging) continue;
+      const th = h.rot * Math.PI / 2, lx = -2.5, lz = -2;
+      const x = h.x + lx * Math.cos(th) + lz * Math.sin(th), z = h.z - lx * Math.sin(th) + lz * Math.cos(th);
+      particles.chimney(x, terrain.heightAt(h.x, h.z) + 6, z);
+      if (Math.random() < 0.5) audio.play("hammer", h.x, h.z, 0.5);
+    }
   }
   // Saqueo: arden los edificios cercanos a los bandidos
   if (campaign.phase === "plunder" && battle.raidTarget) {

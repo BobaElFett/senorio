@@ -183,6 +183,8 @@ export class Campaign {
       if (r.team === 0) v.returnFromLevy(r.id, { x: r.cx, z: r.cz });
       b.removeRegiment(r);
     }
+    const up = v.upgrades;
+    b.bonus[0] = { attack: up.arms, arrow: up.arms * 0.75, defense: up.armor, hp: up.armor * 1.5 };
     v.horses = b.regiments.reduce((n, x) => n + (x.team === 0 && x.type.mounted ? x.count : 0), 0);
 
     const r = this.raid;

@@ -1,7 +1,7 @@
 import { Village, Building, LevyKind, LEVY } from "../settlement/village";
 import { VillageControls, isWall, BuildTool } from "../settlement/villageControls";
 import { WALL, GATE, Wall } from "../settlement/village";
-import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, TOWER_RANGE } from "../data/buildings";
+import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, TOWER_RANGE, UPGRADES, Upgrade } from "../data/buildings";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
   const e = document.createElement(tag);
@@ -37,8 +37,11 @@ export class VillageHud {
       const t = BUILDINGS[kind];
       const b = el("button", "build-btn");
       b.type = "button";
-      b.append(el("span", "build-name", t.label), el("span", "build-cost", costText(t.cost)));
-      b.title = t.description;
+      // Un recurso por línea: la barra cabe en una fila aunque haya muchos edificios
+      const cost = el("span", "build-cost");
+      for (const [r, n] of Object.entries(t.cost) as [Resource, number][]) cost.append(el("span", "", `${n} ${RESOURCE_LABEL[r].toLowerCase()}`));
+      b.append(el("span", "build-name", t.label), cost);
+      b.title = `${t.description} (${costText(t.cost)})`;
       b.addEventListener("click", () => {
         if (this.c.buildKind === kind) this.c.cancelBuild(); else this.c.startBuild(kind);
         b.blur();
@@ -63,6 +66,10 @@ export class VillageHud {
       this.buildBar.append(b);
       this.buttons.set(kind, b);
     }
+    // Avisos y tarjetas se apoyan encima de la barra, que puede ocupar una o dos filas
+    const fit = () => document.body.style.setProperty("--bar-h", `${this.buildBar.offsetHeight}px`);
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(fit).observe(this.buildBar);
+    fit();
   }
 
   /** Fuerza el refresco del panel en el siguiente fotograma. */
@@ -169,7 +176,8 @@ export class VillageHud {
     // Reconstruir solo si cambia el edificio; si no, actualizar textos
     const levyKinds = (Object.keys(LEVY) as LevyKind[]).filter((k) => LEVY[k].at === b.type.kind);
     const levyKey = levyKinds.length ? levyKinds.map((k) => { const p = this.v.levyPlan(k); return `${p.ok}${p.families.length}${p.reason}${p.reused}`; }).join("|") : "";
-    const key = `${b.id}-${b.built}-${b.workers.length}-${b.residents.length}-${this.v.idle.length}-${Math.floor(b.progress * 100)}-${this.v.season}-${levyKey}`;
+    const forgeKey = b.type.kind === "smithy" ? `${JSON.stringify(this.v.upgrades)}${this.v.forging ? Math.floor(this.v.forging.progress * 50) : "-"}${(["arms", "armor"] as Upgrade[]).map((k) => this.v.forgePlan(k).reason).join()}` : "";
+    const key = `${forgeKey}${b.id}-${b.built}-${b.workers.length}-${b.residents.length}-${this.v.idle.length}-${Math.floor(b.progress * 100)}-${this.v.season}-${levyKey}`;
     if (this.panelFor === b && this.panel.dataset.key === key) return;
     this.panelFor = b;
     this.panel.dataset.key = key;
@@ -221,6 +229,27 @@ export class VillageHud {
       } else if (t.kind === "tower") {
         items.push(el("div", "p-row", n ? `Vigía en su puesto: avisa un día antes y dispara a ${TOWER_RANGE} m` : "Sin vigía: ni avisa ni dispara"),
           el("p", "p-note", "Ponla en el lado por el que llegan los bandidos (el oeste)."));
+      } else if (t.kind === "smithy") {
+        const f = v.forging;
+        if (f) {
+          const lvl = v.upgrades[f.kind] + 1;
+          items.push(el("div", "p-row", n ? `Forjando ${UPGRADES[f.kind].label.toLowerCase()} de nivel ${lvl}: ${Math.floor(f.progress * 100)}%` : `Encargo parado (${UPGRADES[f.kind].label.toLowerCase()} ${lvl}): falta herrero`));
+          const bar = el("div", "p-bar"); const fill = el("i"); fill.style.width = `${f.progress * 100}%`; bar.append(fill);
+          items.push(bar);
+        } else items.push(el("div", "p-row", n ? "El herrero espera un encargo" : "Sin herrero: no forja"));
+        for (const kind of ["arms", "armor"] as Upgrade[]) {
+          const u = UPGRADES[kind], plan = v.forgePlan(kind);
+          const btn = el("button", "levy-btn");
+          btn.type = "button";
+          const done = plan.level >= u.levels.length;
+          btn.append(el("span", "levy-name", done ? `${u.label}: nivel máximo` : `Forjar ${u.label.toLowerCase()} · nivel ${plan.level + 1}`),
+            el("span", "levy-cost", done ? `Nivel ${plan.level} (${u.effect} por nivel)` : `${plan.wood} madera · ${plan.coins} monedas · ${plan.days} días · ${u.effect}`));
+          btn.disabled = !plan.ok;
+          if (!plan.ok && !done) btn.append(el("span", "levy-why", plan.reason));
+          btn.onclick = () => { v.startForge(kind); this.invalidate(); };
+          items.push(btn);
+        }
+        items.push(el("p", "p-note", `Nivel actual: armas ${v.upgrades.arms}, armaduras ${v.upgrades.armor}. Valen para todos tus regimientos; la vida extra, solo para las levas nuevas.`));
       } else if (t.kind === "storehouse") {
         items.push(el("div", "p-row", `+${t.storage} de capacidad para cada recurso`));
       } else if (t.kind === "house") {

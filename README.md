@@ -21,6 +21,8 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
   - La carga a galope arrolla a arqueros y milicia y rompe a los lanceros por la espalda; de frente contra lanzas firmes, los jinetes pierden.
   - El barón bandido (tercera incursión) y el modo libre traen jinetes; buscan a tus arqueros y evitan tus lanzas.
   - La batalla de prueba incluye jinetes en los dos bandos.
+- **Herrería** (10 madera, 20 monedas, 1 herrero): encargos de **armas** (+1 ataque y flechas más dañinas por nivel) y **armaduras** (+1 defensa y +1,5 de vida por nivel), dos niveles cada uno, de 4 a 6 días. Un encargo a la vez; se guarda con la partida.
+- La barra de construcción pone un recurso por línea para caber en una fila; los avisos se colocan encima de la barra.
 
 ## Novedades 0.6 (noche del 1 al 2 de noviembre)
 - **Dificultad** al empezar: fácil (bandidos −25% y 6 días más tarde), normal o difícil (+30% y 4 días antes).

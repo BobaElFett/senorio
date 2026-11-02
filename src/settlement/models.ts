@@ -256,7 +256,23 @@ function stable(): THREE.Group {
   return g;
 }
 
-const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower, stable };
+function smithy(): THREE.Group {
+  const g = new THREE.Group();
+  // Fragua de piedra con chimenea, cobertizo abierto, yunque y brasas
+  g.add(box(3.2, 2.2, 2.6, C.stone, -1.9, 0, -1.6));
+  g.add(box(1.1, 3.6, 1.1, C.stone, -2.5, 2.2, -2));
+  g.add(box(0.9, 0.4, 0.5, "#ff7a2a", -1.9, 1.1, -0.2));         // brasas
+  for (const [x, z] of [[-3.6, 0.1], [3.6, 0.1], [3.6, -2.9]]) g.add(box(0.3, 2.8, 0.3, C.timber, x, 0, z));
+  const roof = box(7.8, 0.22, 3.6, C.roof, 0, 2.9, -1.5); roof.rotation.x = 0.18; g.add(roof);
+  g.add(box(3.4, 2.4, 0.2, C.wood, 1.9, 0, -2.9));                // pared del fondo
+  g.add(box(0.5, 0.55, 0.5, C.darkWood, 1, 0, 0.6), box(0.9, 0.22, 0.32, "#4a4e52", 1, 0.55, 0.6)); // yunque
+  g.add(box(1.4, 0.5, 0.7, C.darkWood, 2.6, 0, 1.6));             // banco
+  for (let i = 0; i < 3; i++) g.add(box(0.08, 1.2, 0.08, "#6d7176", 2.2 + i * 0.4, 0.5, 1.6)); // espadas
+  g.add(logPile(-3, 2.4, 3));
+  return g;
+}
+
+const BUILDERS: Record<BuildingKind, () => THREE.Group> = { house, woodcutter, farm, storehouse, market, barracks, mill, bakery, tower, stable, smithy };
 
 export function buildingModel(kind: BuildingKind): THREE.Group {
   const g = BUILDERS[kind]();

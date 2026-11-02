@@ -4,7 +4,7 @@ import { Forest, Tree } from "../world/forest";
 import {
   BUILDINGS, BuildingKind, BuildingType, Resource, RESOURCE_LABEL, RESOURCES,
   MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR,
-  DAY_SECONDS, DAYS_PER_SEASON, SEASONS, BASE_STORAGE, FOOD_PER_FAMILY, FIREWOOD_PER_HOUSE, HORSE_FOOD,
+  DAY_SECONDS, DAYS_PER_SEASON, SEASONS, BASE_STORAGE, FOOD_PER_FAMILY, FIREWOOD_PER_HOUSE, HORSE_FOOD, UPGRADES, Upgrade,
   WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY,
 } from "../data/buildings";
 
@@ -109,6 +109,9 @@ export class Village {
   /** Equipos guardados en el cuartel (por familia) de regimientos licenciados. */
   equipment: Record<LevyKind, number> = { spear: 0, archer: 0, cavalry: 0 };
   mods: Modifier[] = [];
+  /** Mejoras de la herrería ya terminadas y la que se está forjando. */
+  upgrades: Record<Upgrade, number> = { arms: 0, armor: 0 };
+  forging: { kind: Upgrade; progress: number } | null = null;
   /** Caballos en servicio (los cuenta la campaña): comen grano. */
   horses = 0;
   version = 0;
@@ -387,6 +390,14 @@ export class Village {
       } else if (b.type.kind === "bakery") {
         const amt = Math.min(n * BAKE_PER_WORKER * dd, this.res.flour);
         this.res.flour -= amt; this.res.bread += amt * BREAD_PER_FLOUR;
+      } else if (b.type.kind === "smithy" && this.forging) {
+        const f = this.forging, spec = UPGRADES[f.kind].levels[this.upgrades[f.kind]];
+        f.progress += (n * dd) / spec.days;
+        if (f.progress >= 1) {
+          this.upgrades[f.kind]++;
+          this.forging = null;
+          this.event(`Herrería: ${UPGRADES[f.kind].label.toLowerCase()} de nivel ${this.upgrades[f.kind]} listas para la tropa`, "good");
+        }
       } else if (b.type.kind === "market") {
         const housed = this.families.filter((f) => f.home).length;
         this.res.coins += housed * TAX_PER_FAMILY * dd;
@@ -474,6 +485,29 @@ export class Village {
     if (f.home) f.home.residents.splice(f.home.residents.indexOf(f), 1);
     this.families.splice(this.families.indexOf(f), 1);
     f.work = null; f.home = null;
+  }
+
+  // ------------------------------------------------------------ herrería
+  /** Coste de la siguiente mejora de esa línea y si se puede empezar. */
+  forgePlan(kind: Upgrade): { level: number; wood: number; coins: number; days: number; ok: boolean; reason: string } {
+    const level = this.upgrades[kind];
+    const spec = UPGRADES[kind].levels[level];
+    if (!spec) return { level, wood: 0, coins: 0, days: 0, ok: false, reason: "Nivel máximo" };
+    let reason = "";
+    if (!this.has("smithy")) reason = "Hace falta una herrería terminada";
+    else if (this.forging) reason = this.forging.kind === kind ? "Ya se está forjando" : "El herrero está con otro encargo";
+    else if (this.res.wood < spec.wood) reason = `Falta madera (${spec.wood})`;
+    else if (this.res.coins < spec.coins) reason = `Faltan monedas (${spec.coins})`;
+    return { level, ...spec, ok: !reason, reason };
+  }
+
+  startForge(kind: Upgrade): boolean {
+    const plan = this.forgePlan(kind);
+    if (!plan.ok) return false;
+    this.res.wood -= plan.wood; this.res.coins -= plan.coins;
+    this.forging = { kind, progress: 0 };
+    this.version++;
+    return true;
   }
 
   // ------------------------------------------------------------ leva
