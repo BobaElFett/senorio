@@ -29,7 +29,7 @@ const SEEDS: Seed[] = [
   { name: "Vado del Norte", x: 150, z: -215, owner: null, fertility: 1, woods: 1.15, note: "Paso del río al norte" },
   { name: "Hondonada", x: -250, z: -255, owner: null, fertility: 0.9, woods: 1.2, note: "Valle boscoso: leñadores +20%" },
   { name: "Sierra Alta", x: -250, z: 250, owner: null, fertility: 0.8, woods: 1.1, note: "Tierra pobre y alta" },
-  { name: "Castro de Montfort", x: 265, z: -30, owner: "rival", fertility: 1.1, woods: 1, note: "Sede del señor de Montfort", capital: true },
+  { name: "Castro de Montfort", x: 250, z: -30, owner: "rival", fertility: 1.1, woods: 1, note: "Sede del señor de Montfort", capital: true },
   { name: "Llanos de Levante", x: 245, z: 235, owner: "rival", fertility: 1.2, woods: 1, note: "Tierras de Montfort: granjas +20%" },
 ];
 

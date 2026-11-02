@@ -12,6 +12,14 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Sonido:** todo sintetizado en tiempo real (sin archivos): choques de armas, flechas, cargas, cuerno de alarma, campanas, martillos, viento, pájaros y grillos, música de laúd y tambores en las incursiones. Suena tras el primer clic.
 - **Compartir:** el juego es un único archivo (`dist/index.html`); también hay una versión jugable con enlace en claude.ai.
 
+## Mejoras 0.11.1 (pulido, sin funciones nuevas)
+- Una batalla perdida ya no vacía la aldea: la familia que pierde a sus hombres sigue trabajando y recupera uno cada estación (antes desaparecía y en difícil se podía perder la partida en la primera incursión).
+- Las bajas se reparten entre las familias de la leva (antes la primera fila era toda de una familia).
+- El estandarte del Castro de Montfort está en la plaza, delante de la torre (las tropas se metían en los muros).
+- Mapa: la ficha de una tierra sale al instante al hacer clic.
+- Interfaz: la ayuda se pliega a «Controles» mientras hay objetivos; las tarjetas enemigas van bajo el aviso; los avisos repetidos (hambre, frío) se espacian; «Cómo jugar» cubre economía, establo y herrería; pistas de objetivos corregidas.
+- Cámara: nunca mira al cielo vacío al acercarse.
+
 ## Novedades 0.11 · fase 8 (acabado)
 - **Modelos mejores:** soldados con brazos (el del arma golpea al atacar), escudo de cometa en el color del bando, túnica con cinturón, lanzas con punta de hierro y aljaba a la espalda de los arqueros. Las casas tienen cuatro variantes (tejado, muros, chimenea, leña, tonel o banco).
 - **Rendimiento:** alturas del terreno precalculadas, colores y formaciones sin recalcular cada fotograma. Una batalla de unos 1.600 soldados simula en ~5 ms por paso. Ajuste nuevo: **gráficos sencillos** (sin sombras) para ordenadores modestos.

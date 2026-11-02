@@ -67,6 +67,7 @@ export class MapPanel {
       const [x, z] = this.toWorld(i, j);
       this.selected = this.regions.at(x, z);
       this.infoKey = "";
+      this.update();   // respuesta inmediata al clic
     });
     this.canvas.addEventListener("dblclick", (e) => {
       const rect = this.canvas.getBoundingClientRect();
