@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { BuildingKind, BUILDINGS } from "../data/buildings";
 
 // Modelos low-poly de los edificios, generados por código.
@@ -330,7 +331,7 @@ export function houseExtraModel(kind: "garden" | "workshop"): THREE.Group {
     g.add(box(0.7, 0.08, 0.35, "#c9a370", 2.2, 0.75, 2.75));
   }
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  return g;
+  return bake(g);
 }
 
 /** Torre del homenaje del señor rival: piedra, almenas y estandarte rojo. */
@@ -348,13 +349,56 @@ export function keepModel(): THREE.Group {
   const flag = box(2.6, 1.6, 0.06, "#a8302a", 1.35, 0, 0); flag.position.y = 15.6; g.add(flag);
   g.add(box(10.4, 0.5, 10.4, "#7c786d", 0, 0, 0));
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  return g;
+  return bake(g);
+}
+
+// Un material para todas las piezas cocidas: el color va en los vértices
+const BAKED = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 });
+
+/**
+ * Funde las piezas de un modelo (postes, vigas, contraventanas...) en una sola malla con
+ * colores por vértice: una llamada de dibujo por edificio en vez de decenas. Las piezas que
+ * se animan (userData.spin, como las aspas del molino) se quedan aparte.
+ */
+function bake(g: THREE.Group): THREE.Group {
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  const parts: THREE.BufferGeometry[] = [];
+  const keep: THREE.Object3D[] = [];
+  const animated = (o: THREE.Object3D) => { for (let x: THREE.Object3D | null = o; x && x !== g; x = x.parent) if (x.userData.spin) return true; return false; };
+  g.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (animated(m)) return;
+    const mt = m.material as THREE.MeshStandardMaterial;
+    if (Array.isArray(mt) || !mt.color || mt.transparent || mt.map) { keep.push(m); return; }
+    const geo = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+    for (const k of Object.keys(geo.attributes)) if (k !== "position" && k !== "normal") geo.deleteAttribute(k);
+    geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld));
+    const n = geo.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = mt.color.r; col[i * 3 + 1] = mt.color.g; col[i * 3 + 2] = mt.color.b; }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    parts.push(geo);
+  });
+  if (!parts.length) return g;
+  const out = new THREE.Group();
+  const merged = mergeGeometries(parts)!;
+  merged.computeVertexNormals();
+  const mesh = new THREE.Mesh(merged, BAKED);
+  out.add(mesh);
+  // Lo animado y lo especial, tal cual, con su posición respecto al modelo
+  const spins: THREE.Object3D[] = [];
+  g.traverse((o) => { if (o.userData.spin && !spins.some((x) => { let p = o.parent; while (p) { if (p === x) return true; p = p.parent; } return false; })) spins.push(o); });
+  for (const o of [...spins, ...keep.filter((m) => !animated(m))]) {
+    new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld).decompose(o.position, o.quaternion, o.scale);
+    out.add(o);
+  }
+  out.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return out;
 }
 
 export function buildingModel(kind: BuildingKind, variant = 0): THREE.Group {
-  const g = kind === "house" ? house(variant) : BUILDERS[kind]();
-  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  return g;
+  return bake(kind === "house" ? house(variant) : BUILDERS[kind]());
 }
 
 /** Obra: cimientos, andamio y muros que suben con el progreso. */

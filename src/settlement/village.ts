@@ -92,7 +92,7 @@ export const fwdOf = (rot: number): P => ({ x: Math.round(Math.sin(rot * Math.PI
  * familias con casa y trabajo, aprobación, llegada y marcha de familias.
  */
 export class Village {
-  day = 0.27;                          // días desde el inicio (fracción = hora del día)
+  day = 0.33;                          // días desde el inicio (fracción = hora del día)
   res: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0, planks: 0 };
   rates: Record<Resource, number> = { wood: 0, food: 0, coins: 0, flour: 0, bread: 0, planks: 0 };
   breadShare = 0;                      // parte de lo que se come que es pan (0–1)

@@ -19,6 +19,8 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - Mapa: la ficha de una tierra sale al instante al hacer clic.
 - Interfaz: la ayuda se pliega a «Controles» mientras hay objetivos; las tarjetas enemigas van bajo el aviso; los avisos repetidos (hambre, frío) se espacian; «Cómo jugar» cubre economía, establo y herrería; pistas de objetivos corregidas.
 - Cámara: nunca mira al cielo vacío al acercarse.
+- Rendimiento: cada edificio se dibuja como una sola malla (una aldea de 75 edificios pasa de ~1.600 llamadas de dibujo a ~225).
+- La partida empieza a las 8 de la mañana, con luz de día.
 
 ## Novedades 0.11 · fase 8 (acabado)
 - **Modelos mejores:** soldados con brazos (el del arma golpea al atacar), escudo de cometa en el color del bando, túnica con cinturón, lanzas con punta de hierro y aljaba a la espalda de los arqueros. Las casas tienen cuatro variantes (tejado, muros, chimenea, leña, tonel o banco).
