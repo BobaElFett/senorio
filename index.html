@@ -196,6 +196,14 @@
   .howto { display: grid; gap: 10px; font-size: 14px; }
   .howto h3 { margin: 4px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
   .howto p { color: #dfe5dc; }
+  .fb fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .fb legend { font-size: 14px; margin-bottom: 6px; width: 100%; }
+  .fb-rate label { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 5px; padding: 5px 9px; cursor: pointer; }
+  .fb-rate input { accent-color: var(--gold); margin: 0; }
+  .fb-scale { font-size: 12px; color: var(--dim); margin-left: 4px; }
+  .fb-q { display: grid; gap: 4px; font-size: 14px; }
+  .fb textarea { font: inherit; font-size: 13px; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; resize: vertical; }
+  .fb-auto { font-size: 12px !important; color: var(--dim); }
   .menu-credit { text-align: center; font-size: 11px; color: var(--dim); margin: 2px 0 0; }
 
   .select-box { position: fixed; border: 1px solid var(--gold); background: rgba(240, 200, 105, .12); pointer-events: none; z-index: 5; }
@@ -225,6 +233,7 @@
       <button type="button" id="m-battle">Batalla de prueba<span class="m-sub">3 contra 3, aparte de la partida.</span></button>
       <button type="button" id="m-settings">Ajustes</button>
       <button type="button" id="m-howto">Cómo jugar</button>
+      <button type="button" id="m-feedback">Dar tu opinión<span class="m-sub">Un minuto: nos ayuda a mejorar el juego.</span></button>
       <p class="menu-note" id="m-save-note"></p>
     </div>
     <div id="menu-confirm" class="menu-list" hidden>
@@ -240,6 +249,24 @@
       <button type="button" class="diff" data-diff="dificil">Difícil<span class="m-sub">Un 30% más de bandidos y cuatro días antes.</span></button>
       <button type="button" id="m-diff-back">Volver</button>
     </div>
+    <form id="menu-feedback" class="menu-list fb" hidden>
+      <h2>¿Qué te ha parecido?</h2>
+      <fieldset class="fb-rate"><legend>¿Te has divertido?</legend>
+        <label><input type="radio" name="fun" value="1">1</label><label><input type="radio" name="fun" value="2">2</label><label><input type="radio" name="fun" value="3">3</label><label><input type="radio" name="fun" value="4">4</label><label><input type="radio" name="fun" value="5">5</label>
+        <span class="fb-scale">nada · mucho</span>
+      </fieldset>
+      <fieldset class="fb-rate"><legend>¿Volverías a jugar?</legend>
+        <label><input type="radio" name="again" value="si">Sí</label><label><input type="radio" name="again" value="quiza">Quizá</label><label><input type="radio" name="again" value="no">No</label>
+      </fieldset>
+      <label class="fb-q">Lo que más te ha gustado<textarea name="liked" rows="2" maxlength="600"></textarea></label>
+      <label class="fb-q">Lo que te ha confundido o frustrado<textarea name="confused" rows="2" maxlength="600"></textarea></label>
+      <label class="fb-q">¿Algún fallo? (qué hacías y qué pasó)<textarea name="bugs" rows="2" maxlength="600"></textarea></label>
+      <p class="fb-auto">Se envía también un resumen de tu partida (día, familias, incursiones, tierras), sin datos personales.</p>
+      <button type="submit" class="primary" id="fb-send">Enviar</button>
+      <button type="button" id="fb-copy" hidden>Copiar el texto para mandarlo</button>
+      <p class="menu-note" id="fb-note"></p>
+      <button type="button" id="m-feedback-back">Volver</button>
+    </form>
     <div id="menu-settings" class="menu-list" hidden>
       <h2>Ajustes</h2>
       <label class="set-row" for="s-master">Volumen general <input id="s-master" type="range" min="0" max="100"><span></span></label>
@@ -268,7 +295,7 @@
       </div>
       <button type="button" id="m-howto-back">Volver</button>
     </div>
-    <p class="menu-credit">Prototipo 0.10 · Three.js · sonido y música generados en tiempo real</p>
+    <p class="menu-credit">Prototipo 0.11 · Three.js · sonido y música generados en tiempo real</p>
   </div>
 </div>
 
@@ -279,7 +306,7 @@
   <p id="obj-hint"></p>
 </div>
 <div id="help" class="panel">
-  <h1>Señorío · prototipo 0.10</h1>
+  <h1>Señorío · prototipo 0.11</h1>
   <h2>Cámara</h2>
   <p><kbd>W A S D</kbd> mover · ratón al borde (<kbd>B</kbd>: <span class="edge">activado</span>)</p>
   <p>Rueda: zoom · <kbd>Q</kbd> <kbd>E</kbd> o botón central: girar</p>

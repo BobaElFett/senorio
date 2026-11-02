@@ -18,8 +18,9 @@ const $ = (id: string) => document.getElementById(id)!;
  */
 export class Menu {
   isOpen = false;
+  onFeedback: (() => void) | null = null;
   private root = $("menu");
-  private screens = ["menu-main", "menu-confirm", "menu-difficulty", "menu-settings", "menu-howto"];
+  private screens = ["menu-main", "menu-confirm", "menu-difficulty", "menu-settings", "menu-howto", "menu-feedback"];
 
   constructor(private actions: MenuActions, private settings: Settings, private inGame: () => boolean) {
     $("m-continue").onclick = () => this.actions.continueGame();
@@ -41,6 +42,8 @@ export class Menu {
     $("m-resume").onclick = () => this.actions.resume();
     $("m-settings").onclick = () => this.show("menu-settings");
     $("m-howto").onclick = () => this.show("menu-howto");
+    $("m-feedback").onclick = () => { this.onFeedback?.(); this.show("menu-feedback"); };
+    $("m-feedback-back").onclick = () => this.show("menu-main");
     for (const id of ["m-settings-back", "m-howto-back"]) $(id).onclick = () => this.show("menu-main");
 
     // Ajustes

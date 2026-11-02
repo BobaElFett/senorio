@@ -24,6 +24,7 @@ import { Regions } from "./world/regions";
 import { RegionsView } from "./world/regionsView";
 import { MapPanel } from "./ui/mapPanel";
 import { Rival } from "./campaign/rival";
+import { Feedback } from "./ui/feedback";
 
 type Mode = "village" | "battle";
 
@@ -178,6 +179,30 @@ const menu = new Menu({
   resume: () => closeMenu(),
   settingsChanged: (s) => applySettings(s),
 }, settings, () => inGame);
+
+// Opinión de los jugadores: resumen de la partida que se envía con las respuestas
+const feedback = new Feedback(() => ({
+  version: "0.11", difficulty: campaign.difficulty, inGame,
+  day: Math.floor(village.day), year: village.year, families: village.families.length,
+  buildings: village.buildings.filter((b) => b.built).length, approval: Math.round(village.approval),
+  raids: campaign.results.join(","), phase: campaign.phase,
+  lands: regions.count("player"), montfort: rival.alive ? `vivo, ${rival.strength} tierras, le quitaste ${rival.taken}` : "rendido",
+}));
+menu.onFeedback = () => feedback.reset();
+// Tras la primera incursión, una invitación (una sola vez) a dar la opinión
+let feedbackAsked = false;
+try { feedbackAsked = localStorage.getItem("senorio.fbAsked") === "1"; } catch { /* */ }
+function maybeAskFeedback() {
+  if (feedbackAsked || campaign.results.length < 1) return;
+  feedbackAsked = true;
+  try { localStorage.setItem("senorio.fbAsked", "1"); } catch { /* */ }
+  village.event("¿Qué te está pareciendo? Menú (M) → Dar tu opinión: es un minuto", "info");
+}
+// Escribir en el formulario no debe mover la cámara ni abrir menús
+window.addEventListener("keydown", (e) => {
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" && (t as HTMLInputElement).type === "text")) e.stopImmediatePropagation();
+}, true);
 
 function openMenu() { menu.open(); menuPaused = true; audio.play("click"); }
 function closeMenu() {
@@ -390,6 +415,7 @@ renderer.setAnimationLoop(() => {
     objectives.update(dt, inGame);
     hud.update(dt, paused, speed);
   }
+  if (inGame) maybeAskFeedback();
   villageView.update(village, mode === "village" ? vControls.selected : null, dt);
   regionsView.refresh();
   mapT -= dt;

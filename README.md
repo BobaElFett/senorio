@@ -12,6 +12,11 @@ Abre `dist/index.html` con doble clic (Chrome, Edge o Firefox). No hace falta se
 - **Sonido:** todo sintetizado en tiempo real (sin archivos): choques de armas, flechas, cargas, cuerno de alarma, campanas, martillos, viento, pájaros y grillos, música de laúd y tambores en las incursiones. Suena tras el primer clic.
 - **Compartir:** el juego es un único archivo (`dist/index.html`); también hay una versión jugable con enlace en claude.ai.
 
+## Novedades 0.11 · fase 8 (acabado)
+- **Modelos mejores:** soldados con brazos (el del arma golpea al atacar), escudo de cometa en el color del bando, túnica con cinturón, lanzas con punta de hierro y aljaba a la espalda de los arqueros. Las casas tienen cuatro variantes (tejado, muros, chimenea, leña, tonel o banco).
+- **Rendimiento:** alturas del terreno precalculadas, colores y formaciones sin recalcular cada fotograma. Una batalla de unos 1.600 soldados simula en ~5 ms por paso. Ajuste nuevo: **gráficos sencillos** (sin sombras) para ordenadores modestos.
+- **Opinión de los jugadores:** en el menú, «Dar tu opinión» (diversión, si volverían a jugar, qué gustó, qué confundió, fallos) con un resumen automático de la partida. En la versión de claude.ai se guarda para el autor; si no se puede, ofrece copiar el texto. Tras la primera incursión el juego invita una vez a contestar.
+
 ## Novedades 0.10 · fase 7 (el mundo)
 - **Mapa de 720 m** (antes 400) con **diez tierras** de bordes irregulares, lindes pintadas en el suelo y un estandarte en cada una. El río las separa del este; se cruza por dos vados.
 - **Mapa del señorío** (tecla **N** o botón «Mapa»): tierras por dueño, edificios, tropas y cámara. Clic en una tierra: rasgos, reclamar, ir allí (doble clic también lleva la cámara).
