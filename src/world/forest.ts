@@ -22,11 +22,11 @@ export class Forest {
     const rnd = mulberry32(seed);
     const patches = new ValueNoise(seed + 5);
     const half = MAP_SIZE / 2 - 6;
-    for (let tries = 0; tries < 30000 && this.trees.length < 2600; tries++) {
+    for (let tries = 0; tries < 100000 && this.trees.length < 8000; tries++) {
       const x = (rnd() * 2 - 1) * half;
       const z = (rnd() * 2 - 1) * half;
       if (patches.fbm(x * 0.012, z * 0.012, 3) < 0.12) continue;     // fuera de una mancha de bosque
-      if (terrain.isVillageArea(x, z, 25)) continue;
+      if (terrain.isVillageArea(x, z, 25) || terrain.isRivalSeat(x, z, 18)) continue;
       if (terrain.riverDistance(x, z) < 22) continue;
       const y = terrain.heightAt(x, z);
       if (y < WATER_LEVEL + 1) continue;

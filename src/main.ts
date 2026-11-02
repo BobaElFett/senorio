@@ -20,6 +20,9 @@ import { Menu } from "./ui/menu";
 import { GameAudio } from "./audio/audio";
 import { Particles } from "./world/particles";
 import { Objectives } from "./ui/objectives";
+import { Regions } from "./world/regions";
+import { RegionsView } from "./world/regionsView";
+import { MapPanel } from "./ui/mapPanel";
 
 type Mode = "village" | "battle";
 
@@ -57,6 +60,10 @@ const lights: Lights = { scene, sun, hemi, sunOffset: new THREE.Vector3(-120, 16
 // --- Sistemas ------------------------------------------------------------
 const rts = new RtsCamera(renderer.domElement, terrain);
 const village = new Village(terrain, nav, forest);
+const regions = new Regions();
+village.regions = regions;
+const regionsView = new RegionsView(regions, terrain);
+scene.add(regionsView.group);
 const villageView = new VillageView(scene, terrain);
 
 // Partida: aldea y combate en el mismo mapa
@@ -75,6 +82,12 @@ const hud = new Hud(battle, controls, { start() {}, restart() {} }, "v-", {
   banner: () => campaign.banner(),
   disband: (r) => { campaign.disband(r); controls.selected.delete(r); },
 });
+
+// Mapa del señorío
+let mapT = 0;
+const mapPanel = new MapPanel(regions, terrain, forest, village, battle, () => rts.target,
+  (x, z) => { const v = rts.getView(); rts.setView(x, z, v.yaw, Math.max(90, v.d)); });
+document.getElementById("map-btn")!.addEventListener("click", (e) => { if (inGame) mapPanel.toggle(); (e.target as HTMLElement).blur(); });
 
 // Sonido, partículas y ajustes
 const audio = new GameAudio();
@@ -201,6 +214,8 @@ function setMode(m: Mode) {
     if (!testBattle.regiments.length) resetBattle();
   }
   battleView.setVisible(m === "village");
+  regionsView.group.visible = m === "village";
+  if (m !== "village") mapPanel.close();
   testView.setVisible(m === "battle");
   const v = views[m];
   if (v) rts.setView(v.x, v.z, v.yaw, v.d);
@@ -242,6 +257,8 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (menu.isOpen) return;
+  if (mapPanel.isOpen && e.code === "Escape") { mapPanel.close(); return; }
+  if (e.code === "KeyN" && mode === "village" && inGame) { mapPanel.toggle(); return; }
   if (e.code === "KeyH") help.hidden = !help.hidden;
   else if (e.code === "KeyB") {
     settings.edgePan = !settings.edgePan;
@@ -364,6 +381,9 @@ renderer.setAnimationLoop(() => {
     hud.update(dt, paused, speed);
   }
   villageView.update(village, mode === "village" ? vControls.selected : null, dt);
+  regionsView.refresh();
+  mapT -= dt;
+  if (mapT <= 0) { mapT = 0.25; mapPanel.update(); }
   if (inGame && mode === "village") villageEffects(dt);
   particles.update(menuPaused || paused ? 0 : dt * speed);
   audio.hour = mode === "battle" ? 0.5 : village.hour;
@@ -382,4 +402,4 @@ renderer.setAnimationLoop(() => {
 });
 
 // Acceso de depuración desde la consola del navegador
-(window as any).game = { scene, terrain, rts, renderer, battle, controls, nav, village, vControls, forest, setMode, campaign, testBattle, testControls, menu, audio, saveNow, beginNew, beginFromSave, particles };
+(window as any).game = { regions, mapPanel, scene, terrain, rts, renderer, battle, controls, nav, village, vControls, forest, setMode, campaign, testBattle, testControls, menu, audio, saveNow, beginNew, beginFromSave, particles };

@@ -1,6 +1,7 @@
 import { Terrain, MAP_SIZE } from "../world/terrain";
 import { NavGrid, P } from "../world/navgrid";
 import { Forest, Tree } from "../world/forest";
+import { Regions, Region, TRIBUTE } from "../world/regions";
 import {
   BUILDINGS, BuildingKind, BuildingType, Resource, RESOURCE_LABEL, RESOURCES,
   MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR, SAW_PER_WORKER, PLANKS_PER_WOOD, SAW_RESERVE, lackText, HOUSE_EXTRAS, HouseExtra, EXTRA_MIN_APPROVAL, TradeGood, TRADE_GOODS, TRADE_BASE, TRADE_SEASON, TRADE_LOT, TRADE_SELL, TRADE_BUY,
@@ -115,6 +116,8 @@ export class Village {
   /** Mejoras de la herrería ya terminadas y la que se está forjando. */
   upgrades: Record<Upgrade, number> = { arms: 0, armor: 0 };
   forging: { kind: Upgrade; progress: number } | null = null;
+  /** Tierras del mapa (si las hay, solo se construye en las propias). */
+  regions: Regions | null = null;
   /** Caballos en servicio (los cuenta la campaña): comen grano. */
   horses = 0;
   version = 0;
@@ -234,6 +237,10 @@ export class Village {
     for (const r of [rect, field]) {
       if (!r) continue;
       if (r.minX < -lim || r.maxX > lim || r.minZ < -lim || r.maxZ > lim) return { ok: false, reason: "Demasiado cerca del borde" };
+      // Solo se construye en tierras propias
+      if (this.regions) for (const [px, pz] of [[r.minX, r.minZ], [r.maxX, r.minZ], [r.minX, r.maxZ], [r.maxX, r.maxZ], [x, z]]) {
+        if (!this.regions.ownedBy(px, pz, "player")) return { ok: false, reason: `Fuera de tus tierras (${this.regions.at(px, pz).name}): reclámala en el mapa` };
+      }
     }
     let lo = Infinity, hi = -Infinity;
     for (let px = rect.minX; px <= rect.maxX + 0.01; px += Math.max(1, (rect.maxX - rect.minX) / 5)) {
@@ -375,7 +382,7 @@ export class Village {
       const n = b.workers.length;
       if (b.type.kind === "woodcutter") {
         const trees = this.forest.within(b.door.x, b.door.z, 45);
-        const amount = n * WOOD_PER_WORKER * Math.min(1, trees.length / 30) * dd;
+        const amount = n * WOOD_PER_WORKER * Math.min(1, trees.length / 30) * (this.regions ? this.regions.at(b.x, b.z).woods : 1) * dd;
         this.res.wood += amount;
         b.cutAcc += amount;
         while (b.cutAcc >= 4 && trees.length) {
@@ -386,7 +393,7 @@ export class Village {
           this.forest.fell(best);
         }
       } else if (b.type.kind === "farm") {
-        this.res.food += n * FARM_YIELD[season] * dd;
+        this.res.food += n * FARM_YIELD[season] * this.fertility(b) * dd;
       } else if (b.type.kind === "mill") {
         const amt = Math.max(0, Math.min(n * MILL_PER_WORKER * dd, this.res.food - MILL_RESERVE));
         this.res.food -= amt; this.res.flour += amt;
@@ -409,6 +416,9 @@ export class Village {
         this.res.coins += housed * TAX_PER_FAMILY * dd;
       }
     }
+
+    // Tributo de las tierras reclamadas
+    if (this.regions) this.res.coins += Math.max(0, this.regions.count("player") - 1) * TRIBUTE * dd;
 
     // Los precios vuelven poco a poco a lo normal
     for (const g of TRADE_GOODS) this.pressure[g] += (1 - this.pressure[g]) * Math.min(1, 0.15 * dd);
@@ -505,6 +515,31 @@ export class Village {
     if (f.home) f.home.residents.splice(f.home.residents.indexOf(f), 1);
     this.families.splice(this.families.indexOf(f), 1);
     f.work = null; f.home = null;
+  }
+
+  // ------------------------------------------------------------ tierras
+  fertility(b: Building) { return this.regions ? this.regions.at(b.x, b.z).fertility : 1; }
+
+  claimPlan(r: Region): { cost: number; ok: boolean; reason: string } {
+    const R = this.regions!;
+    const cost = R.claimCost();
+    let reason = "";
+    if (r.owner === "player") reason = "Ya es tuya";
+    else if (r.owner === "rival") reason = "Es del señor de Montfort: tómala ocupando su estandarte con tus tropas";
+    else if (!r.neighbors.some((id) => R.list[id].owner === "player")) reason = "Tiene que lindar con tus tierras";
+    else if (this.res.coins < cost) reason = `Faltan monedas (${cost})`;
+    return { cost, ok: !reason, reason };
+  }
+
+  claim(r: Region): boolean {
+    const plan = this.claimPlan(r);
+    if (!plan.ok) return false;
+    this.res.coins -= plan.cost;
+    r.owner = "player";
+    this.regions!.version++;
+    this.addMod("Nuevas tierras", 5, 5);
+    this.event(`Reclamas ${r.name}: ya puedes construir allí y paga tributo`, "good");
+    return true;
   }
 
   // ------------------------------------------------------------ comercio
@@ -668,6 +703,7 @@ export class Village {
       if (this.terrain.heightAt(x, z) < 0.6) reason = "No se puede levantar en el agua";
       const lim = 185;
       if (Math.abs(x) > lim || Math.abs(z) > lim) reason = "Demasiado cerca del borde";
+      else if (this.regions && !this.regions.ownedBy(x, z, "player")) reason = "Fuera de tus tierras";
       for (const b of this.buildings) {
         const r = b.rect;
         if (x > r.minX - 0.8 && x < r.maxX + 0.8 && z > r.minZ - 0.8 && z < r.maxZ + 0.8) { reason = `Atraviesa ${b.type.label.toLowerCase()}`; break; }

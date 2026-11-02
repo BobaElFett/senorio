@@ -1,3 +1,4 @@
+import { Region } from "../world/regions";
 import { Village, Building, Family } from "../settlement/village";
 import { Forest } from "../world/forest";
 import { Campaign, Phase } from "../campaign/campaign";
@@ -8,7 +9,7 @@ import { UnitKind } from "../data/units";
 // Guardado de la partida en el navegador (localStorage). Una ranura más un autoguardado diario.
 
 const KEY = "senorio.save.v1";
-const VERSION = 1;
+const VERSION = 2;   // 2: mapa de 720 m con tierras
 
 interface SavedRegiment {
   id: number; team: Team; name: string; kind: UnitKind; x: number; z: number; facing: number; files: number;
@@ -28,6 +29,7 @@ export interface SaveData {
     families: { id: number; name: string; home: number | null; work: number | null; prev: number | null; members: number; levied: number | null; x: number; z: number }[];
   };
   felled: number[];
+  regions?: (string | null)[];
   walls?: { ax: number; az: number; bx: number; bz: number; gate: boolean; built: boolean; progress: number; hp: number }[];
   campaign: { raidIndex: number; phase: Phase; results: Campaign["results"]; plunderTime: number; withdrawTime: number; levyCount: Record<string, number>; difficulty?: Campaign["difficulty"]; endless?: boolean; endlessShift?: number };
   regiments: SavedRegiment[];
@@ -56,6 +58,7 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
       })),
     },
     felled: forest.trees.flatMap((t, i) => (t.alive ? [] : [i])),
+    regions: v.regions ? v.regions.list.map((r) => r.owner) : undefined,
     walls: v.walls.map((w) => ({ ax: w.ax, az: w.az, bx: w.bx, bz: w.bz, gate: w.gate, built: w.built, progress: w.progress, hp: w.hp })),
     campaign: { raidIndex: c.raidIndex, phase: c.phase, results: [...c.results], plunderTime: c.plunderTime, withdrawTime: c.withdrawTime, levyCount: { ...cc.levyCount }, difficulty: c.difficulty, endless: c.endless, endlessShift: c.endlessShift },
     regiments: b.regiments.filter((r) => r.state !== "gone" && r.alive.length).map((r) => ({
@@ -69,7 +72,12 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
 /** Reconstruye la partida en un mundo recién creado (sin `village.setup()`). */
 export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b: Battle) {
   const vv = v as any, cc = c as any;
-  for (const i of d.felled) { const t = forest.trees[i]; if (t) forest.fell(t); }
+  // Las partidas de la versión 1 eran de otro mapa: sus árboles talados no corresponden
+  if (d.v >= 2) for (const i of d.felled) { const t = forest.trees[i]; if (t) forest.fell(t); }
+  if (v.regions && d.regions) {
+    d.regions.forEach((o, i) => { const r = v.regions!.list[i]; if (r) r.owner = o as Region["owner"]; });
+    v.regions.version++;
+  }
 
   v.day = d.village.day;
   v.res = Object.assign({ wood: 0, food: 0, coins: 0, flour: 0, bread: 0, planks: 0 }, d.village.res);
@@ -143,7 +151,7 @@ export function readSave(): SaveData | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const d = JSON.parse(raw) as SaveData;
-    return d.v === VERSION ? d : null;
+    return d.v >= 1 && d.v <= VERSION ? d : null;
   } catch { return null; }
 }
 

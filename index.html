@@ -131,6 +131,21 @@
   .trade-btn.sell { color: #9fd38a; }
   .trade-btn.buy { color: #e8b48a; }
   .trade-btn:disabled { opacity: .35; cursor: default; }
+  #map { position: fixed; inset: 0; z-index: 6; display: grid; place-items: center; background: rgba(10,14,12,.45); }
+  #map[hidden] { display: none; }
+  .map-card { padding: 14px 16px; display: grid; gap: 10px; max-width: calc(100vw - 24px); }
+  .map-head { display: flex; align-items: center; gap: 14px; }
+  .map-head h2 { margin: 0; font-size: 17px; flex: 1; }
+  .map-legend { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+  .map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-left: 6px; }
+  .lg-p { background: #3f6fd0; } .lg-r { background: #c0392b; } .lg-n { background: #e8e2c8; }
+  #map-close { font: inherit; font-size: 20px; line-height: 1; background: transparent; color: var(--dim); border: 0; cursor: pointer; padding: 0 4px; }
+  #map-close:hover { color: var(--ink); }
+  .map-body { display: flex; gap: 14px; align-items: start; flex-wrap: wrap; }
+  #map-canvas { width: min(560px, calc(100vw - 60px), calc(100vh - 140px)); aspect-ratio: 1; border-radius: 6px; cursor: pointer; image-rendering: auto; }
+  #map-info { width: 240px; display: grid; gap: 6px; }
+  #map-info h3 { margin: 0; font-size: 15px; }
+  .p-go { font: inherit; font-size: 12px; background: rgba(255,255,255,.08); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 5px; cursor: pointer; }
   .p-del { font: inherit; font-size: 12px; margin-top: 4px; background: transparent; color: var(--bad); border: 1px solid rgba(224,103,90,.5); border-radius: 4px; padding: 5px; cursor: pointer; }
   .p-del:disabled { opacity: .4; cursor: default; }
 
@@ -189,7 +204,14 @@
 <body>
 <div id="app"></div>
 
-<div id="modebar" class="panel"><button type="button" id="menu-btn" title="Menú (M)">Menú</button><button type="button" data-mode="village">Aldea</button><button type="button" data-mode="battle">Batalla de prueba</button></div>
+<div id="modebar" class="panel"><button type="button" id="menu-btn" title="Menú (M)">Menú</button><button type="button" data-mode="village">Aldea</button><button type="button" data-mode="battle">Batalla de prueba</button><button type="button" id="map-btn" class="village-only" title="Mapa del señorío (N)">Mapa</button></div>
+
+<div id="map" hidden>
+  <div class="map-card panel">
+    <div class="map-head"><h2>El señorío</h2><span class="map-legend"><i class="lg-p"></i>Tuyas <i class="lg-r"></i>Montfort <i class="lg-n"></i>Sin dueño</span><button type="button" id="map-close" title="Cerrar (N o Esc)">×</button></div>
+    <div class="map-body"><canvas id="map-canvas"></canvas><div id="map-info"></div></div>
+  </div>
+</div>
 
 <div id="menu" hidden>
   <div class="menu-card">
@@ -267,6 +289,7 @@
     <p>Cuartel: reclutar entre las familias</p>
     <p>Establo: jinetes (cargan por el flanco y la espalda; evita las lanzas de frente)</p>
     <p>Herrería: mejores armas y armaduras para tus tropas</p>
+    <p><kbd>N</kbd> mapa: tierras, reclamar y tributo</p>
     <p>Mercado con tendero: comprar y vender en lotes de 10</p>
     <p>Clic en una casa (60% de aprobación): huerto o taller</p>
     <p>Empalizada y puerta: clic inicio, clic final</p>

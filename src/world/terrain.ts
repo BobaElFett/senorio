@@ -1,11 +1,13 @@
 import * as THREE from "three";
 import { ValueNoise } from "./noise";
 
-export const MAP_SIZE = 400;      // metros de lado
+export const MAP_SIZE = 720;      // metros de lado
 export const WATER_LEVEL = 0;
-const SEGMENTS = 160;
+const SEGMENTS = 260;
 const VILLAGE_RADIUS = 45;        // zona llana central para construir
 const VILLAGE_HEIGHT = 3;
+/** Explanada del castro del señor rival, al este del río. */
+export const RIVAL_SEAT = { x: 265, z: -30, r: 34, h: 7 };
 
 /**
  * Terreno procedural: colinas suaves, un río que cruza el mapa de norte a sur
@@ -40,6 +42,9 @@ export class Terrain {
   isVillageArea(x: number, z: number, margin = 0): boolean {
     return Math.hypot(x, z) < VILLAGE_RADIUS + margin;
   }
+  isRivalSeat(x: number, z: number, margin = 0): boolean {
+    return Math.hypot(x - RIVAL_SEAT.x, z - RIVAL_SEAT.z) < RIVAL_SEAT.r + margin;
+  }
 
   heightAt(x: number, z: number): number {
     // Colinas grandes + detalle pequeño
@@ -52,6 +57,8 @@ export class Terrain {
     const d = Math.hypot(x, z);
     const t = smoothstep(VILLAGE_RADIUS, VILLAGE_RADIUS + 40, d);
     h = VILLAGE_HEIGHT + (h - VILLAGE_HEIGHT) * t;
+    const tr = smoothstep(RIVAL_SEAT.r, RIVAL_SEAT.r + 35, Math.hypot(x - RIVAL_SEAT.x, z - RIVAL_SEAT.z));
+    h = RIVAL_SEAT.h + (h - RIVAL_SEAT.h) * tr;
 
     // Cauce del río: valle ancho y lecho por debajo del agua
     const rd = this.riverDistance(x, z);
