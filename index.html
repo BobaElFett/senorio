@@ -129,6 +129,8 @@
   .toast { background: var(--panel); border-right: 3px solid var(--dim); border-radius: 4px; padding: 6px 10px; font-size: 13px; transition: opacity .8s; }
   .toast.good { border-right-color: var(--good); } .toast.bad { border-right-color: var(--bad); }
   .toast.fade { opacity: 0; }
+  .place-tip.info { background: rgba(30, 36, 32, .9); }
+  .wall-btn:first-of-type, .build-btn.wall-btn { border-style: dashed; }
   .place-tip { position: fixed; background: rgba(160, 40, 30, .9); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 4px; pointer-events: none; z-index: 7; }
   #v-banner { left: calc(50% + 70px); top: 92px; transform: translateX(-50%); padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); max-width: 640px; text-align: center; }
   #v-banner[data-kind="warn"] { border-color: var(--warn); color: #f6dca0; }
@@ -223,7 +225,7 @@
         <p>Elige edificios en la barra de abajo y colócalos con clic izquierdo (R gira). Las familias sin trabajo construyen. Haz clic en un edificio para asignar trabajadores.</p>
         <p>Cada familia come 0,8 al día. Las granjas no producen en invierno y las casas queman leña: guarda reservas. Con 50% de aprobación y casas libres llegan familias.</p>
         <h3>La defensa</h3>
-        <p>Tres incursiones llegan por el oeste, con dos días de aviso. Construye un cuartel y recluta: cada familia aporta cuatro hombres, que no trabajan mientras sirven.</p>
+        <p>Una empalizada obliga a los bandidos a rodearla o derribarla tramo a tramo; por las puertas pasan los tuyos. Tres incursiones llegan por el oeste, con dos días de aviso. Construye un cuartel y recluta: cada familia aporta cuatro hombres, que no trabajan mientras sirven.</p>
         <p>Clic o recuadro para elegir tropas, clic derecho para mover o atacar, arrastrar con clic derecho para trazar el frente. Los flancos y la retaguardia hunden la moral.</p>
         <p>Cada caído es un hombre de una familia de la aldea. Licencia los regimientos al terminar para que vuelvan a trabajar.</p>
         <h3>Teclas</h3>
@@ -231,7 +233,7 @@
       </div>
       <button type="button" id="m-howto-back">Volver</button>
     </div>
-    <p class="menu-credit">Prototipo 0.6 · Three.js · sonido y música generados en tiempo real</p>
+    <p class="menu-credit">Prototipo 0.7 · Three.js · sonido y música generados en tiempo real</p>
   </div>
 </div>
 
@@ -242,7 +244,7 @@
   <p id="obj-hint"></p>
 </div>
 <div id="help" class="panel">
-  <h1>Señorío · prototipo 0.6</h1>
+  <h1>Señorío · prototipo 0.7</h1>
   <h2>Cámara</h2>
   <p><kbd>W A S D</kbd> mover · ratón al borde (<kbd>B</kbd>: <span class="edge">activado</span>)</p>
   <p>Rueda: zoom · <kbd>Q</kbd> <kbd>E</kbd> o botón central: girar</p>
@@ -254,6 +256,7 @@
     <p>Las familias sin trabajo construyen las obras</p>
     <h2>Defensa</h2>
     <p>Cuartel: reclutar entre las familias</p>
+    <p>Empalizada y puerta: clic inicio, clic final</p>
     <p>Tropas: clic, recuadro, <kbd>1</kbd>–<kbd>9</kbd> · clic der.: mover o atacar</p>
     <p>Arrastrar clic der.: frente · <kbd>X</kbd>: alto</p>
   </div>

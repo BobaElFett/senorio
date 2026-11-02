@@ -27,6 +27,7 @@ export interface SaveData {
     families: { id: number; name: string; home: number | null; work: number | null; prev: number | null; members: number; levied: number | null; x: number; z: number }[];
   };
   felled: number[];
+  walls?: { ax: number; az: number; bx: number; bz: number; gate: boolean; built: boolean; progress: number; hp: number }[];
   campaign: { raidIndex: number; phase: Phase; results: Campaign["results"]; plunderTime: number; withdrawTime: number; levyCount: Record<string, number>; difficulty?: Campaign["difficulty"]; endless?: boolean; endlessShift?: number };
   regiments: SavedRegiment[];
   objectives?: string[];
@@ -53,6 +54,7 @@ export function serialize(v: Village, forest: Forest, c: Campaign, b: Battle): S
       })),
     },
     felled: forest.trees.flatMap((t, i) => (t.alive ? [] : [i])),
+    walls: v.walls.map((w) => ({ ax: w.ax, az: w.az, bx: w.bx, bz: w.bz, gate: w.gate, built: w.built, progress: w.progress, hp: w.hp })),
     campaign: { raidIndex: c.raidIndex, phase: c.phase, results: [...c.results], plunderTime: c.plunderTime, withdrawTime: c.withdrawTime, levyCount: { ...cc.levyCount }, difficulty: c.difficulty, endless: c.endless, endlessShift: c.endlessShift },
     regiments: b.regiments.filter((r) => r.state !== "gone" && r.alive.length).map((r) => ({
       id: r.id, team: r.team, name: r.name, kind: r.type.kind, x: r.x, z: r.z, facing: r.facing, files: r.files,
@@ -90,7 +92,11 @@ export function restore(d: SaveData, v: Village, forest: Forest, c: Campaign, b:
     if (work) work.workers.push(f);
     v.families.push(f);
   }
-  vv.nextId = d.village.nextId;
+  for (const s of d.walls ?? []) {
+    const w = v.addWall(s.ax, s.az, s.bx, s.bz, s.gate, s.built);
+    w.progress = s.progress; w.hp = s.hp;
+  }
+  vv.nextId = Math.max(d.village.nextId, vv.nextId);
   vv.nameIdx = d.village.nameIdx;
   v.version++;
 

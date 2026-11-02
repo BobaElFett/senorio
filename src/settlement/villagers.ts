@@ -1,4 +1,4 @@
-import { Village, Family, Building, Rect } from "./village";
+import { Village, Family, Rect } from "./village";
 import { P } from "../world/navgrid";
 
 const WALK = 2.3; // m/s
@@ -8,7 +8,7 @@ const randIn = (r: Rect, m = 1): P => ({
   z: r.minZ + m + Math.random() * Math.max(0.1, r.maxZ - r.minZ - 2 * m),
 });
 
-function around(b: Building): P {
+function around(b: { rect: Rect }): P {
   // Un punto junto al perímetro de la obra
   const r = b.rect, side = Math.floor(Math.random() * 4), t = Math.random();
   const x = side < 2 ? r.minX + (r.maxX - r.minX) * t : side === 2 ? r.minX - 1.2 : r.maxX + 1.2;

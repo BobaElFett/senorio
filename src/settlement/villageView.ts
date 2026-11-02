@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { Village, Building, Rect } from "./village";
+import { Village, Building, Rect, Wall, WALL, GATE } from "./village";
 import { buildingModel, constructionModel } from "./models";
 import { BuildingKind } from "../data/buildings";
 import { Terrain } from "../world/terrain";
@@ -26,6 +26,10 @@ const FIELD_COLORS = ["#86a64a", "#a8b84c", "#d2b14c", "#8a6e4a"]; // primavera,
 export class VillageView {
   readonly group = new THREE.Group();
   private views = new Map<Building, BView>();
+  private wallViews = new Map<Wall, THREE.Group>();
+  private wallGhost: THREE.InstancedMesh;
+  private wallMat = new THREE.MeshStandardMaterial({ color: "#7a5a3a", flatShading: true, roughness: 0.95 });
+  private gateMat = new THREE.MeshStandardMaterial({ color: "#5a3f26", flatShading: true, roughness: 0.95 });
   private villagers: THREE.InstancedMesh;
   private vHeads: THREE.InstancedMesh;
   private vLegs: THREE.InstancedMesh[];
@@ -61,6 +65,12 @@ export class VillageView {
       m.castShadow = true; m.frustumCulled = false; m.count = 0;
       this.group.add(m);
     }
+    const post = new THREE.CylinderGeometry(0.16, 0.2, 2.8, 5);
+    post.translate(0, 1.4, 0);
+    this.wallGhost = new THREE.InstancedMesh(post, this.ghostMats.ok, 400);
+    this.wallGhost.count = 0;
+    this.wallGhost.frustumCulled = false;
+    this.group.add(this.wallGhost);
     this.outline = this.makeLoop("#ffe39a");
     this.ghostField = this.makeLoop("#ffffff");
     this.group.add(this.outline, this.ghostField);
@@ -144,7 +154,7 @@ export class VillageView {
     return m;
   }
 
-  update(v: Village, selected: Building | null, dt: number) {
+  update(v: Village, selected: Building | Wall | null, dt: number) {
     // Alta y baja de edificios
     for (const b of v.buildings) if (!this.views.has(b)) this.views.set(b, this.create(b));
     for (const [b, bv] of this.views) {
@@ -167,6 +177,8 @@ export class VillageView {
         bv.model.traverse((o) => { if (o.userData.spin) o.rotation.z -= dt * 1.2; });
       }
     }
+
+    this.updateWalls(v);
 
     // Campos según la estación: brotes en primavera, altos en verano, dorados en otoño, tierra en invierno
     const sf = v.seasonFloat, s = Math.floor(sf), into = sf - s;
@@ -204,7 +216,9 @@ export class VillageView {
     if (this.villagers.instanceColor) this.villagers.instanceColor.needsUpdate = true;
 
     // Selección
-    if (selected && this.views.has(selected)) {
+    if (selected && "gate" in selected) {
+      this.writeLoop(this.outline, selected.rect, 1.2);
+    } else if (selected && this.views.has(selected)) {
       const r = selected.fieldRect ? {
         minX: Math.min(selected.rect.minX, selected.fieldRect.minX), minZ: Math.min(selected.rect.minZ, selected.fieldRect.minZ),
         maxX: Math.max(selected.rect.maxX, selected.fieldRect.maxX), maxZ: Math.max(selected.rect.maxZ, selected.fieldRect.maxZ),
@@ -212,6 +226,83 @@ export class VillageView {
       this.writeLoop(this.outline, r, 1);
     } else this.outline.visible = false;
     void dt;
+  }
+
+  /** Tramo de empalizada: troncos apuntados que siguen el terreno; puerta con postes y hojas. */
+  private makeWall(w: Wall): THREE.Group {
+    const g = new THREE.Group();
+    g.userData.wall = w;
+    const len = Math.hypot(w.bx - w.ax, w.bz - w.az);
+    const ang = Math.atan2(w.bx - w.ax, w.bz - w.az);
+    if (w.gate) {
+      const geos: THREE.BufferGeometry[] = [];
+      for (const t of [0, 1]) {
+        const x = w.ax + (w.bx - w.ax) * t, z = w.az + (w.bz - w.az) * t;
+        const p = new THREE.CylinderGeometry(0.32, 0.36, 4.2, 6);
+        p.translate(x, this.terrain.heightAt(x, z) + 2.1, z);
+        geos.push(p.toNonIndexed());
+      }
+      const mx = (w.ax + w.bx) / 2, mz = (w.az + w.bz) / 2, my = Math.max(this.terrain.heightAt(w.ax, w.az), this.terrain.heightAt(w.bx, w.bz));
+      const beam = new THREE.BoxGeometry(0.3, 0.35, len + 0.6);
+      beam.rotateY(ang); beam.translate(mx, my + 3.9, mz);
+      const doors = new THREE.BoxGeometry(0.16, 2.5, len - 0.7);
+      doors.rotateY(ang); doors.translate(mx, my + 1.25, mz);
+      geos.push(beam.toNonIndexed(), doors.toNonIndexed());
+      const m = new THREE.Mesh(mergeGeometries(geos)!, this.gateMat);
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+    } else {
+      const geos: THREE.BufferGeometry[] = [];
+      const n = Math.max(2, Math.round(len / 0.42));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const x = w.ax + (w.bx - w.ax) * t, z = w.az + (w.bz - w.az) * t;
+        const h = 2.4 + ((i * 7919) % 5) * 0.08;
+        const log = new THREE.CylinderGeometry(0.2, 0.22, h, 5);
+        log.translate(x, this.terrain.heightAt(x, z) + h / 2 - 0.2, z);
+        const tip = new THREE.ConeGeometry(0.2, 0.45, 5);
+        tip.translate(x, this.terrain.heightAt(x, z) + h - 0.2 + 0.22, z);
+        geos.push(log.toNonIndexed(), tip.toNonIndexed());
+      }
+      const m = new THREE.Mesh(mergeGeometries(geos)!, this.wallMat);
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+    }
+    this.group.add(g);
+    return g;
+  }
+
+  private updateWalls(v: Village) {
+    for (const w of v.walls) if (!this.wallViews.has(w)) this.wallViews.set(w, this.makeWall(w));
+    for (const [w, g] of this.wallViews) {
+      if (!v.walls.includes(w)) { this.group.remove(g); this.wallViews.delete(w); continue; }
+      // En obra: crece desde el suelo; dañado: se inclina un poco
+      const base = Math.max(this.terrain.heightAt(w.ax, w.az), this.terrain.heightAt(w.bx, w.bz));
+      const sy = w.built ? 1 : 0.12 + 0.88 * w.progress;
+      g.scale.y = sy;
+      g.position.y = base * (1 - sy);
+      const max = w.gate ? GATE.hp : WALL.hp;
+      g.rotation.z = w.built ? (1 - w.hp / max) * 0.06 : 0;
+    }
+  }
+
+  /** Fantasma de la empalizada mientras se traza. */
+  setWallGhost(segs: { ax: number; az: number; bx: number; bz: number }[] | null, ok: boolean) {
+    if (!segs) { this.wallGhost.count = 0; return; }
+    this.wallGhost.material = ok ? this.ghostMats.ok : this.ghostMats.bad;
+    let i = 0;
+    const m = new THREE.Matrix4();
+    for (const s of segs) {
+      const len = Math.hypot(s.bx - s.ax, s.bz - s.az);
+      const n = Math.max(1, Math.round(len / 0.8));
+      for (let k = 0; k <= n && i < 400; k++) {
+        const x = s.ax + (s.bx - s.ax) * k / n, z = s.az + (s.bz - s.az) * k / n;
+        m.makeTranslation(x, this.terrain.heightAt(x, z) - 0.2, z);
+        this.wallGhost.setMatrixAt(i++, m);
+      }
+    }
+    this.wallGhost.count = i;
+    this.wallGhost.instanceMatrix.needsUpdate = true;
   }
 
   /** Fantasma de colocación: verde si se puede construir, rojo si no. */
@@ -240,11 +331,12 @@ export class VillageView {
   pick(ray: THREE.Raycaster): Building | null {
     const targets: THREE.Object3D[] = [];
     for (const bv of this.views.values()) { targets.push(bv.root); if (bv.field) targets.push(bv.field); }
+    for (const g of this.wallViews.values()) targets.push(g);
     const hits = ray.intersectObjects(targets, true);
     for (const h of hits) {
       let o: THREE.Object3D | null = h.object;
-      while (o && !o.userData.building) o = o.parent;
-      if (o) return o.userData.building as Building;
+      while (o && !o.userData.building && !o.userData.wall) o = o.parent;
+      if (o) return (o.userData.building ?? o.userData.wall) as Building;
     }
     return null;
   }

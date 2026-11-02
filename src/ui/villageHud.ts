@@ -1,5 +1,6 @@
 import { Village, Building, LevyKind, LEVY } from "../settlement/village";
-import { VillageControls } from "../settlement/villageControls";
+import { VillageControls, isWall, BuildTool } from "../settlement/villageControls";
+import { WALL, GATE, Wall } from "../settlement/village";
 import { BUILDINGS, BUILD_ORDER, Resource, RESOURCE_LABEL, WOOD_PER_WORKER, FARM_YIELD, TAX_PER_FAMILY, MILL_PER_WORKER, MILL_RESERVE, BAKE_PER_WORKER, BREAD_PER_FLOUR } from "../data/buildings";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -38,6 +39,23 @@ export class VillageHud {
       b.type = "button";
       b.append(el("span", "build-name", t.label), el("span", "build-cost", costText(t.cost)));
       b.title = t.description;
+      b.addEventListener("click", () => {
+        if (this.c.buildKind === kind) this.c.cancelBuild(); else this.c.startBuild(kind);
+        b.blur();
+      });
+      this.buildBar.append(b);
+      this.buttons.set(kind, b);
+    }
+    // Empalizada y puerta: se trazan con dos clics
+    const walls: [BuildTool, string, string, string][] = [
+      ["palisade", "Empalizada", `${WALL.wood} madera / 4 m`, "Clic en el inicio y clic en el final; sigue encadenando tramos. Frena a los bandidos: tendrán que rodearla o derribarla."],
+      ["gate", "Puerta", `${GATE.wood} madera`, "Un hueco de 5 m en la empalizada: pasan los tuyos, los bandidos no."],
+    ];
+    for (const [kind, label, cost, tip] of walls) {
+      const b = el("button", "build-btn wall-btn");
+      b.type = "button";
+      b.append(el("span", "build-name", label), el("span", "build-cost", cost));
+      b.title = tip;
       b.addEventListener("click", () => {
         if (this.c.buildKind === kind) this.c.cancelBuild(); else this.c.startBuild(kind);
         b.blur();
@@ -111,7 +129,8 @@ export class VillageHud {
 
     for (const [kind, b] of this.buttons) {
       const t = BUILDINGS[kind as keyof typeof BUILDINGS];
-      const afford = (Object.entries(t.cost) as [Resource, number][]).every(([r, n]) => v.res[r] >= n);
+      const afford = t ? (Object.entries(t.cost) as [Resource, number][]).every(([r, n]) => v.res[r] >= n)
+        : v.res.wood >= (kind === "gate" ? GATE.wood : WALL.wood);
       b.classList.toggle("cant", !afford);
       b.classList.toggle("active", this.c.buildKind === kind);
     }
@@ -119,10 +138,34 @@ export class VillageHud {
     this.renderPanel();
   }
 
+  private renderWallPanel(w: Wall) {
+    const key = `w${w.id}-${w.built}-${Math.ceil(w.hp)}-${Math.floor(w.progress * 100)}`;
+    if (this.panel.dataset.key === key) return;
+    this.panel.dataset.key = key;
+    this.panelFor = null;
+    const max = w.gate ? GATE.hp : WALL.hp;
+    const items: HTMLElement[] = [el("h3", "", w.gate ? "Puerta" : "Empalizada"),
+      el("p", "p-desc", w.gate ? "Pasan los tuyos y los aldeanos; los bandidos tienen que derribarla." : "Los bandidos tienen que rodearla o derribarla a hachazos.")];
+    if (!w.built) {
+      items.push(el("div", "p-row", `En obras: ${Math.floor(w.progress * 100)}%`));
+    } else {
+      items.push(el("div", "p-row", `Resistencia: ${Math.ceil(w.hp)} de ${max}`));
+      const bar = el("div", "p-bar"); const fill = el("i"); fill.style.width = `${(w.hp / max) * 100}%`; bar.append(fill);
+      items.push(bar);
+    }
+    const del = el("button", "p-del", w.built ? "Demoler tramo (devuelve la mitad)" : "Cancelar tramo");
+    del.type = "button";
+    del.onclick = () => { this.v.removeWall(w, true); this.c.selected = null; this.invalidate(); };
+    items.push(del);
+    this.panel.replaceChildren(...items);
+  }
+
   private renderPanel() {
-    const b = this.c.selected;
-    if (!b) { this.panel.hidden = true; this.panelFor = null; return; }
+    const sel = this.c.selected;
+    if (!sel) { this.panel.hidden = true; this.panelFor = null; return; }
     this.panel.hidden = false;
+    if (isWall(sel)) { this.renderWallPanel(sel); return; }
+    const b = sel;
     // Reconstruir solo si cambia el edificio; si no, actualizar textos
     const levyKey = b.type.kind === "barracks" ? (["spear", "archer"] as LevyKind[]).map((k) => { const p = this.v.levyPlan(k); return `${p.ok}${p.families.length}${p.reason}${p.reused}`; }).join("|") : "";
     const key = `${b.id}-${b.built}-${b.workers.length}-${b.residents.length}-${this.v.idle.length}-${Math.floor(b.progress * 100)}-${this.v.season}-${levyKey}`;

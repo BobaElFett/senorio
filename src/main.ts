@@ -82,6 +82,8 @@ const particles = new Particles();
 scene.add(particles.group);
 const settings = loadSettings();
 battle.onEvent = (kind, x, z) => soundFor(kind, x, z);
+battle.walls = () => village.walls;
+battle.onWallHit = (id, dmg) => village.damageWall(id, dmg);
 
 function soundFor(kind: "strike" | "fire" | "hit" | "charge" | "rout", x: number, z: number) {
   if (kind === "strike") audio.play("clash", x, z);

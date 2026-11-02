@@ -10,6 +10,21 @@ import {
 
 export interface Rect { minX: number; minZ: number; maxX: number; maxZ: number }
 
+/** Tramo de empalizada o puerta. Las puertas dejan pasar a los tuyos y frenan a los bandidos. */
+export interface Wall {
+  id: number;
+  ax: number; az: number; bx: number; bz: number;
+  gate: boolean;
+  built: boolean;
+  progress: number;
+  hp: number;
+  cells: number[];
+  rect: Rect;
+}
+export const WALL_SEGMENT = 4;          // metros por tramo
+export const WALL = { wood: 1, days: 0.35, hp: 320 };
+export const GATE = { wood: 3, days: 0.8, hp: 450, length: 5 };
+
 export interface Building {
   id: number;
   type: BuildingType;
@@ -42,7 +57,7 @@ export interface Family {
   name: string;
   home: Building | null;
   work: Building | null;
-  site: Building | null;    // obra donde ayuda (si no tiene trabajo)
+  site: Building | Wall | null;    // obra donde ayuda (si no tiene trabajo)
   members: number;          // hombres en edad de luchar (4 al llegar)
   levied: number | null;    // id del regimiento en el que sirve
   prevWork: Building | null; // trabajo que dejó para ir a la leva
@@ -79,6 +94,7 @@ export class Village {
   /** Comida total: grano y pan. */
   get foodTotal() { return this.res.food + this.res.bread; }
   buildings: Building[] = [];
+  walls: Wall[] = [];
   families: Family[] = [];
   approval = 60;
   approvalTarget = 60;
@@ -326,6 +342,20 @@ export class Village {
         this.version++;
       }
     }
+    // Empalizada: tramo a tramo, dos constructores por tramo
+    let wallsDone = 0;
+    for (const w of this.walls) {
+      if (w.built) continue;
+      const n = Math.min(2, builders.length - bi);
+      if (n <= 0) break;
+      for (let k = 0; k < n; k++) builders[bi++].site = w;
+      w.progress += (n * dd) / (w.gate ? GATE.days : WALL.days);
+      if (w.progress >= 1) {
+        w.progress = 1; w.built = true; wallsDone++;
+        this.nav.setWall(w.cells, true, w.gate);
+      }
+    }
+    if (wallsDone && !this.walls.some((w) => !w.built)) this.event("Empalizada terminada", "good");
 
     // Producción
     const before = { ...this.res };
@@ -501,5 +531,73 @@ export class Village {
       if (w && this.buildings.includes(w) && w.built && w.workers.length < w.type.workers) { f.work = w; w.workers.push(f); }
     }
     this.rehouse();
+  }
+
+  // ------------------------------------------------------------ empalizada
+  /** Tramos en que se divide la línea a-b (una puerta es un único tramo de 5 m). */
+  wallPlan(ax: number, az: number, bx: number, bz: number, gate: boolean) {
+    let len = Math.hypot(bx - ax, bz - az);
+    if (gate && len > 0.01) { const k = GATE.length / len; bx = ax + (bx - ax) * k; bz = az + (bz - az) * k; len = GATE.length; }
+    const n = gate ? 1 : Math.max(1, Math.ceil(len / WALL_SEGMENT));
+    const segs: { ax: number; az: number; bx: number; bz: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      segs.push({ ax: ax + (bx - ax) * i / n, az: az + (bz - az) * i / n, bx: ax + (bx - ax) * (i + 1) / n, bz: az + (bz - az) * (i + 1) / n });
+    }
+    const wood = gate ? GATE.wood : segs.length * WALL.wood;
+    let reason = "";
+    if (len < 2) reason = "Arrastra más para trazar el tramo";
+    for (let t = 0; t <= 1 && !reason; t += 0.5 / Math.max(1, len)) {
+      const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+      if (this.terrain.heightAt(x, z) < 0.6) reason = "No se puede levantar en el agua";
+      const lim = 185;
+      if (Math.abs(x) > lim || Math.abs(z) > lim) reason = "Demasiado cerca del borde";
+      for (const b of this.buildings) {
+        const r = b.rect;
+        if (x > r.minX - 0.8 && x < r.maxX + 0.8 && z > r.minZ - 0.8 && z < r.maxZ + 0.8) { reason = `Atraviesa ${b.type.label.toLowerCase()}`; break; }
+      }
+    }
+    if (!reason && this.res.wood < wood) reason = `Falta madera (${wood})`;
+    return { segs, wood, ok: !reason, reason };
+  }
+
+  placeWall(ax: number, az: number, bx: number, bz: number, gate: boolean): Wall[] {
+    const plan = this.wallPlan(ax, az, bx, bz, gate);
+    if (!plan.ok) return [];
+    this.res.wood -= plan.wood;
+    const out = plan.segs.map((g) => this.addWall(g.ax, g.az, g.bx, g.bz, gate, false));
+    if (!this.idle.length) this.event("Nadie libre para construir la empalizada", "bad");
+    return out;
+  }
+
+  addWall(ax: number, az: number, bx: number, bz: number, gate: boolean, built: boolean): Wall {
+    const w: Wall = {
+      id: this.nextId++, ax, az, bx, bz, gate, built, progress: built ? 1 : 0,
+      hp: gate ? GATE.hp : WALL.hp, cells: this.nav.wallCells(ax, az, bx, bz),
+      rect: { minX: Math.min(ax, bx), maxX: Math.max(ax, bx), minZ: Math.min(az, bz), maxZ: Math.max(az, bz) },
+    };
+    this.forest.clearRect(w.rect.minX - 1, w.rect.minZ - 1, w.rect.maxX + 1, w.rect.maxZ + 1);
+    if (built) this.nav.setWall(w.cells, true, gate);
+    this.walls.push(w);
+    return w;
+  }
+
+  /** Golpe de los bandidos; devuelve true si el tramo cae. */
+  damageWall(id: number, dmg: number): boolean {
+    const w = this.walls.find((x) => x.id === id);
+    if (!w || !w.built) return false;
+    w.hp -= dmg;
+    if (w.hp > 0) return false;
+    this.removeWall(w);
+    this.event(w.gate ? "¡Los bandidos han echado abajo una puerta!" : "¡Los bandidos han abierto una brecha en la empalizada!", "bad");
+    return true;
+  }
+
+  removeWall(w: Wall, refund = false) {
+    const i = this.walls.indexOf(w);
+    if (i < 0) return;
+    if (w.built) this.nav.setWall(w.cells, false, w.gate);
+    if (refund) this.res.wood += Math.floor((w.gate ? GATE.wood : WALL.wood) * (w.built ? 0.5 : 1));
+    for (const f of this.families) if (f.site === w) f.site = null;
+    this.walls.splice(i, 1);
   }
 }

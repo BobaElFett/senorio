@@ -27,6 +27,9 @@ export interface Soldier {
   routeT: number;
 }
 
+/** Lo que el combate necesita saber de un tramo de empalizada. */
+export interface WallRef { id: number; ax: number; az: number; bx: number; bz: number; built: boolean }
+
 export interface Arrow {
   x: number; y: number; z: number;
   vx: number; vy: number; vz: number;
@@ -66,6 +69,7 @@ export class Regiment {
   cx = 0; cz = 0;               // centro de masas de los vivos
   plundering = false;           // bandidos saqueando la aldea
   withdrawing = false;          // bandidos retirándose con el botín
+  breach: WallRef | null = null; // tramo de empalizada que están derribando
   size: number;                 // efectivos al formarse
 
   constructor(
@@ -116,6 +120,9 @@ export class Battle {
   campaign = false;              // en la aldea: sin resultado de batalla, IA de saqueo
   raidTarget: P | null = null;   // adonde van los bandidos si nadie les sale al paso
   onCasualty: ((s: Soldier) => void) | null = null;
+  /** Empalizada de la aldea (para que los bandidos la rodeen o la derriben). */
+  walls: () => WallRef[] = () => [];
+  onWallHit: ((id: number, dmg: number) => boolean) | null = null;
   /** Avisos para el sonido: golpe, disparo, impacto de flecha, carga, huida. */
   onEvent: ((kind: "strike" | "fire" | "hit" | "charge" | "rout", x: number, z: number) => void) | null = null;
   private nextReg = 0;
@@ -152,7 +159,7 @@ export class Battle {
     r.size = n;
     for (let i = 0; i < n; i++) {
       const slot = r.slotPos(i, n);
-      const p = this.nav.nearestOpen(slot.x, slot.z);
+      const p = this.nav.nearestOpen(slot.x, slot.z, team === 1);
       const s: Soldier = {
         id: this.nextId++, reg: r, x: p.x, z: p.z, y: this.terrain.heightAt(p.x, p.z),
         vx: 0, vz: 0, heading: facing, hp: type.hp, alive: true, fled: false, slot: i,
@@ -181,14 +188,15 @@ export class Battle {
   orderMove(r: Regiment, x: number, z: number, facing: number | null, files: number | null) {
     if (!r.active) return;
     if (files) r.files = clamp(Math.round(files), 2, Math.max(2, r.count));
-    const dest = this.nav.nearestOpen(x, z);
+    const en = r.team === 1;
+    const dest = this.nav.nearestOpen(x, z, en);
     const dist = Math.hypot(dest.x - r.x, dest.z - r.z);
     // Si el destino queda a la espalda, media vuelta en vez de girar toda la línea
     const goingTo = dist > 12 ? Math.atan2(dest.x - r.x, dest.z - r.z) : (facing ?? r.facing);
     if (Math.abs(angleDiff(goingTo, r.facing)) > 1.9) r.aboutFace();
     r.order = { kind: "move" };
     r.running = false;
-    r.path = this.nav.findPath(r.x, r.z, dest.x, dest.z) ?? [dest];
+    r.path = this.nav.findPath(r.x, r.z, dest.x, dest.z, en) ?? [dest];
     r.destFacing = facing;
   }
 
@@ -293,7 +301,7 @@ export class Battle {
             const k = (d - r.type.range * 0.8) / d;
             const gx = r.cx + (t.cx - r.cx) * k, gz = r.cz + (t.cz - r.cz) * k;
             const off = { x: r.x - r.cx, z: r.z - r.cz };
-            r.path = this.nav.findPath(r.x, r.z, gx + off.x, gz + off.z) ?? [];
+            r.path = this.nav.findPath(r.x, r.z, gx + off.x, gz + off.z, r.team === 1) ?? [];
           }
         } else {
           r.path = [];
@@ -313,7 +321,7 @@ export class Battle {
         }
         else if (r.repath <= 0) {
           r.repath = 1;
-          r.path = this.nav.findPath(r.x, r.z, t.cx, t.cz) ?? [{ x: t.cx, z: t.cz }];
+          r.path = this.nav.findPath(r.x, r.z, t.cx, t.cz, r.team === 1) ?? [{ x: t.cx, z: t.cz }];
         }
       }
     }
@@ -409,13 +417,25 @@ export class Battle {
           gx = t.x - ((t.x - s.x) / d) * 1.1; gz = t.z - ((t.z - s.z) / d) * 1.1;
         }
         maxSpeed = r.running ? r.type.runSpeed : r.type.speed * 1.2;
+      } else if (r.breach && !r.path.length) {
+        // Derribando la empalizada: cada uno a su trozo de muro, a hachazos
+        const p = this.wallPoint(r.breach, s.x, s.z, 2.0);
+        gx = p.x + (Math.random() - 0.5) * 0.2; gz = p.z;
+        maxSpeed = r.type.speed;
+        if (p.d < 3.2 && s.cooldown <= 0) {
+          s.cooldown = 1.4 + Math.random() * 0.6;
+          s.attackAnim = 1;
+          this.onEvent?.("strike", s.x, s.z);
+          if (this.onWallHit?.(r.breach.id, 0.3 + r.type.attack * 0.1)) r.breach = null;
+        }
       } else {
         gx = slot.x; gz = slot.z;
         // Si un edificio o el agua tapan el camino al hueco, rodear con A*
         s.routeT -= dt;
         if (slotDist > 3 && s.routeT <= 0) {
           s.routeT = 1.2 + Math.random() * 0.6;
-          s.route = this.nav.lineOfSight(s.x, s.z, slot.x, slot.z) ? [] : (this.nav.findPath(s.x, s.z, slot.x, slot.z) ?? []);
+          const en = r.team === 1;
+          s.route = this.nav.lineOfSight(s.x, s.z, slot.x, slot.z, en) ? [] : (this.nav.findPath(s.x, s.z, slot.x, slot.z, en) ?? []);
         } else if (slotDist <= 3) s.route = [];
         while (s.route.length && Math.hypot(s.route[0].x - s.x, s.route[0].z - s.z) < 1.2) s.route.shift();
         if (s.route.length) { gx = s.route[0].x; gz = s.route[0].z; }
@@ -440,9 +460,10 @@ export class Battle {
     const a = Math.min(1, dt * 8);
     s.vx += (wx - s.vx) * a; s.vz += (wz - s.vz) * a;
     const nx = s.x + s.vx * dt, nz = s.z + s.vz * dt;
-    if (!this.nav.blockedAt(nx, nz)) { s.x = nx; s.z = nz; }
-    else if (!this.nav.blockedAt(nx, s.z)) { s.x = nx; s.vz = 0; }
-    else if (!this.nav.blockedAt(s.x, nz)) { s.z = nz; s.vx = 0; }
+    const en = r.team === 1;
+    if (!this.nav.blockedAt(nx, nz, en)) { s.x = nx; s.z = nz; }
+    else if (!this.nav.blockedAt(nx, s.z, en)) { s.x = nx; s.vz = 0; }
+    else if (!this.nav.blockedAt(s.x, nz, en)) { s.z = nz; s.vx = 0; }
     else { s.vx = 0; s.vz = 0; }
     s.y = Math.max(-0.4, this.terrain.heightAt(s.x, s.z));
 
@@ -620,6 +641,28 @@ export class Battle {
         const t = this.raidTarget;
         const d = Math.hypot(t.x - r.cx, t.z - r.cz);
         r.plundering = d < 22 && !r.engaged;
+        // ¿Hay camino hasta la aldea? Si la empalizada lo cierra, a derribar el tramo más a mano
+        if (r.breach && !this.walls().some((w) => w.id === r.breach!.id && w.built)) r.breach = null;
+        if (!r.breach && d > 14) {
+          const path = this.nav.findPath(r.cx, r.cz, t.x, t.z, true);
+          const end = path && path[path.length - 1];
+          const closed = !end || Math.hypot(end.x - t.x, end.z - t.z) > 10;
+          if (closed) {
+            let wbest: WallRef | null = null, wd = Infinity;
+            for (const w of this.walls()) {
+              if (!w.built) continue;
+              const mx = (w.ax + w.bx) / 2, mz = (w.az + w.bz) / 2;
+              const score = Math.hypot(mx - r.cx, mz - r.cz) + Math.hypot(mx - t.x, mz - t.z) * 0.6;
+              if (score < wd) { wd = score; wbest = w; }
+            }
+            if (wbest) {
+              r.breach = wbest;
+              const p = this.wallSide(wbest, r.cx, r.cz, 3);
+              this.orderMove(r, p.x, p.z, Math.atan2(-p.nx, -p.nz), null);
+            }
+          }
+        }
+        if (r.breach) continue;
         if (d > 14 && (r.order.kind !== "move" || !r.path.length)) {
           const k = Math.min(1, 10 / Math.max(1, d));
           this.orderMove(r, t.x + (r.cx - t.x) * k + (r.id % 3 - 1) * 8, t.z + (r.cz - t.z) * k, Math.atan2(t.x - r.cx, t.z - r.cz), null);
@@ -641,6 +684,24 @@ export class Battle {
       }
       if (r.order.kind !== "attack" || r.order.target !== best) this.orderAttack(r, best);
     }
+  }
+
+  /** Punto a `off` m del centro del tramo, del lado de (x, z), y la normal hacia el muro. */
+  private wallSide(w: WallRef, x: number, z: number, off: number) {
+    const mx = (w.ax + w.bx) / 2, mz = (w.az + w.bz) / 2;
+    const len = Math.hypot(w.bx - w.ax, w.bz - w.az) || 1;
+    let nx = -(w.bz - w.az) / len, nz = (w.bx - w.ax) / len;
+    if ((x - mx) * nx + (z - mz) * nz < 0) { nx = -nx; nz = -nz; }
+    return { x: mx + nx * off, z: mz + nz * off, nx, nz };
+  }
+
+  /** Punto del tramo más cercano a (x, z), separado `off` m hacia su lado. */
+  private wallPoint(w: WallRef, x: number, z: number, off: number) {
+    const dx = w.bx - w.ax, dz = w.bz - w.az, l2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0.1, Math.min(0.9, ((x - w.ax) * dx + (z - w.az) * dz) / l2));
+    const px = w.ax + dx * t, pz = w.az + dz * t;
+    const side = this.wallSide(w, x, z, 0);
+    return { x: px + side.nx * off, z: pz + side.nz * off, d: Math.hypot(x - px, z - pz) };
   }
 
   private checkResult() {
